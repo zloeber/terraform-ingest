@@ -1,0 +1,15 @@
+[env]
+_.source = '.envrc'
+
+[settings]
+python.uv_venv_auto = true
+
+[tools]
+python = "3.13"
+task = 'latest'
+uv = "latest"
+yq = "latest"
+jq = 'latest'
+yamllint = "1.37.1"
+terraform = "latest"
+

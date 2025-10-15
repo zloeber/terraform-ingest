@@ -1,0 +1,10 @@
+repositories:
+- url: git@gitlab.com:sram/gdo/shared/terraform-modules.git
+  name: aws-shared-terraform-modules
+  branches:
+  - main
+  include_tags: true
+  max_tags: 5
+  path: modules/aws
+output_dir: ./output
+clone_dir: ./repos

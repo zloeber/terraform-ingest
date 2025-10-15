@@ -19,7 +19,7 @@ def cli():
 
 
 @cli.command()
-@click.argument("config_file", type=click.Path(exists=True))
+@click.argument("config_file", type=click.Path(exists=True), default="config.yaml")
 @click.option(
     "--output-dir",
     "-o",

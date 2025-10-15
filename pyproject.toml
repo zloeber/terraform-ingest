@@ -1,0 +1,53 @@
+[project]
+name = "terraform-ingest"
+dynamic = ["version"]
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.3.0",
+    "fastapi>=0.119.0",
+    "gitpython>=3.1.45",
+    "httpx>=0.28.1",
+    "pydantic>=2.12.2",
+    "python-hcl2>=7.3.1",
+    "pyyaml>=6.0.3",
+    "uvicorn>=0.37.0"
+]
+authors = [
+    {name = "Zachary Loeber", email = "zloeber@gmail.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+description = "A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file of terraform git repository sources, downloads them locally using existing credentials, creates JSON summaries of their purpose, inputs, outputs, and providers on the main and git tag branches for ingestion via a RAG pipeline into a vector database."
+readme = "README.md"
+#license-files = ["LICENSE"]
+
+[dependency-groups]
+dev = [
+    "black>=25.9.0",
+    "flake8>=7.3.0",
+    "mypy>=1.18.2",
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+]
+
+[tool.setuptools_scm]
+version_file = "src/terraform_ingest/_version.py"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "_version.py"
+
+[project.scripts]
+terraform-ingest = "terraform_ingest.cli:main"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+# [tool.hatch.build.targets.sdist]
+# include = ["/src/terraform_ingest", "/README.md", "/pyproject.toml"]
+

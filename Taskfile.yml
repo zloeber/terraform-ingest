@@ -1,0 +1,87 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+## NOTE: Don't update this file if you are syncing via vendir.
+##       Create/update ./Taskfile.custom.yml instead!
+version: "3"
+silent: true
+vars:
+  TARGET:
+    sh: 'echo "${TARGET:-"default"}"'
+  PROFILE:
+    sh: 'echo "${PROFILE:-"default"}"'
+  PROJECT:
+    sh: 'echo "$(basename $(pwd))"'
+  PYTHON_VENV_PATH: "{{.ROOT_DIR}}/.venv"
+  LOCAL_BIN_PATH: "{{.PYTHON_VENV_PATH}}/bin"
+  BUILD_DATE:
+    sh: "date '+%Y-%m-%d-%H:%M:%S'"
+  BUILD_DATE_SHORT:
+    sh: "date '+%Y-%m-%d-%H%M%S'"
+  GIT_LATEST_TAG:
+    sh: 'git tag -l 2>/dev/null | sort -r -V | head -n 1 2>/dev/null || echo "not a git repo"'
+  TERM: screen-256color
+  DOCS_PATH: "{{.ROOT_DIR}}/docs"
+  SCRIPT_PATH: "{{.ROOT_DIR}}/scripts"
+  VERSION: '{{default "unknown" .GIT_LATEST_TAG}}'
+
+dotenv:
+  - ".env"
+
+includes:
+  github:
+    taskfile: ./tasks/Taskfile.github.yml
+    optional: true
+tasks:
+  default:
+    cmds:
+      - task -l
+
+  show:
+    desc: Show task variables
+    cmds:
+      - |
+        echo "ROOT_PATH: {{.ROOT_DIR}}"
+        echo "PROFILE: {{.PROFILE}}"
+        echo "PROJECT: {{.PROJECT}}"
+        echo "VERSION: {{.VERSION}}"
+        echo "OS: {{OS}}"
+        echo "ARCH: {{ARCH}}"
+        echo "LOCAL_BIN_PATH: {{.LOCAL_BIN_PATH}}"
+        echo "DOCS_PATH: {{.DOCS_PATH}}"
+        echo "SCRIPT_PATH: {{.SCRIPT_PATH}}"
+        echo "BUILD_DATE: {{.BUILD_DATE}}"
+        echo "GIT_LATEST_TAG: {{.GIT_LATEST_TAG}}"
+
+  show:all:
+    desc: Show all variables for task namespaces
+    cmds:
+      - |
+        echo "## Show ##";
+        task show
+        echo ""
+        for taskitem in $(task -l | cut -d " " -f2 | grep show | sed 's/.$//'); do
+          if [[ "$taskitem" != "show:all" ]]; then
+            echo "## Show - ${taskitem} ##";
+            task $taskitem;
+            echo "";
+          fi
+        done
+
+  list:
+    desc: List tasks by namespace (task list -- <namespace>)
+    cmds:
+      - |
+        if [[ "{{.CLI_ARGS}}" != "" ]]; then
+          task -l | grep {{default "" .CLI_ARGS}}
+        else
+          task -l
+        fi
+
+  autocomplete:
+    desc: Setup task autocomplete (zsh)
+    cmds:
+      - sudo curl https://raw.githubusercontent.com/go-task/task/main/completion/zsh/_task \
+        -o /usr/local/share/zsh/site-functions/_task
+    status:
+      - "test -f /usr/local/share/zsh/site-functions/_task"
+

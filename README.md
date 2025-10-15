@@ -14,14 +14,8 @@ A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file o
 ## Installation
 
 ```bash
-pip install -r requirements.txt
-pip install -e .
-```
-
-Or install directly:
-
-```bash
-pip install click fastapi uvicorn pyyaml gitpython python-hcl2 pydantic
+uv sync
+source .venv/bin/activate
 ```
 
 ## Usage

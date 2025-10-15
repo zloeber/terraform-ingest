@@ -47,3 +47,10 @@ output/
 # Temp files
 .DS_Store
 *.log
+
+# Hatch
+.hatch/
+_version.py
+
+# app specific
+output/
