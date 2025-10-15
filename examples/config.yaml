@@ -1,0 +1,28 @@
+# Example configuration for terraform-ingest
+# This file defines the repositories to ingest and processing options
+
+repositories:
+  # Example: AWS VPC Terraform module
+  - url: https://github.com/terraform-aws-modules/terraform-aws-vpc
+    name: terraform-aws-vpc
+    branches:
+      - main
+      - master
+    include_tags: true
+    max_tags: 5
+    path: .
+
+  # Example: AWS EC2 Terraform module
+  - url: https://github.com/terraform-aws-modules/terraform-aws-ec2-instance
+    name: terraform-aws-ec2
+    branches:
+      - main
+    include_tags: true
+    max_tags: 3
+    path: .
+
+# Output directory for JSON summaries
+output_dir: ./output
+
+# Directory for cloning repositories
+clone_dir: ./repos
