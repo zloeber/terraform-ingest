@@ -56,6 +56,7 @@ class RepositoryConfig(BaseModel):
     include_tags: bool = True
     max_tags: Optional[int] = 10
     path: str = "."
+    recursive: bool = False
 
 
 class IngestConfig(BaseModel):

@@ -21,7 +21,7 @@ class TerraformParser:
         """Initialize the parser with a module path."""
         self.module_path = Path(module_path)
 
-    def parse_module(self, repo_url: str, ref: str) -> TerraformModuleSummary:
+    def parse_module(self, repo_url: str, ref: str, relative_path: Optional[str] = None) -> TerraformModuleSummary:
         """Parse a Terraform module and return a summary."""
         variables = self._parse_variables()
         outputs = self._parse_outputs()
@@ -30,10 +30,13 @@ class TerraformParser:
         description = self._extract_description()
         readme_content = self._read_readme()
 
+        # Use relative path if provided, otherwise use the full module path
+        path_for_summary = relative_path if relative_path else str(self.module_path)
+
         return TerraformModuleSummary(
             repository=repo_url,
             ref=ref,
-            path=str(self.module_path),
+            path=path_for_summary,
             description=description,
             variables=variables,
             outputs=outputs,

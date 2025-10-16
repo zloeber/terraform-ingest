@@ -44,13 +44,20 @@ class TerraformIngest:
 
     def _save_summary(self, summary: TerraformModuleSummary):
         """Save a summary to a JSON file."""
-        # Create a safe filename from repository and ref
+        # Create a safe filename from repository, ref, and path
         repo_name = summary.repository.rstrip("/").split("/")[-1]
         if repo_name.endswith(".git"):
             repo_name = repo_name[:-4]
 
         ref_name = summary.ref.replace("/", "_")
-        filename = f"{repo_name}_{ref_name}.json"
+        
+        # Include module path in filename if it's not the root
+        if summary.path and summary.path != "." and summary.path != "/":
+            # Clean up the path for filename use
+            path_part = summary.path.replace("/", "_").replace("\\", "_")
+            filename = f"{repo_name}_{ref_name}_{path_part}.json"
+        else:
+            filename = f"{repo_name}_{ref_name}.json"
 
         output_path = self.output_dir / filename
 

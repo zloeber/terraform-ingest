@@ -105,7 +105,12 @@ def ingest(config_file, output_dir, clone_dir, cleanup):
     default=10,
     help="Maximum number of tags to process",
 )
-def analyze(repository_url, branch, output, include_tags, max_tags):
+@click.option(
+    "--recursive/--no-recursive",
+    default=True,
+    help="Recursively search for terraform modules in subdirectories",
+)
+def analyze(repository_url, branch, output, include_tags, max_tags, recursive):
     """Analyze a single terraform repository.
     
     REPOSITORY_URL: Git URL of the repository to analyze.
@@ -127,6 +132,7 @@ def analyze(repository_url, branch, output, include_tags, max_tags):
             branches=[branch],
             include_tags=include_tags,
             max_tags=max_tags,
+            recursive=recursive,
         )
         
         config = IngestConfig(

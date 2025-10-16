@@ -38,11 +38,10 @@ class RepositoryManager:
         # Process branches
         for branch in repo_config.branches:
             try:
-                summary = self._process_ref(
+                branch_summaries = self._process_ref(
                     repo, repo_config, branch, repo_path, repo_config.path
                 )
-                if summary:
-                    summaries.append(summary)
+                summaries.extend(branch_summaries)
             except Exception as e:
                 print(f"Error processing branch {branch}: {e}")
 
@@ -51,11 +50,10 @@ class RepositoryManager:
             tags = self._get_tags(repo, repo_config.max_tags)
             for tag in tags:
                 try:
-                    summary = self._process_ref(
+                    tag_summaries = self._process_ref(
                         repo, repo_config, tag, repo_path, repo_config.path
                     )
-                    if summary:
-                        summaries.append(summary)
+                    summaries.extend(tag_summaries)
                 except Exception as e:
                     print(f"Error processing tag {tag}: {e}")
 
@@ -85,25 +83,64 @@ class RepositoryManager:
         ref: str,
         repo_path: Path,
         module_path: str = ".",
-    ) -> Optional[TerraformModuleSummary]:
+    ) -> List[TerraformModuleSummary]:
         """Process a specific git ref (branch or tag)."""
         try:
             # Checkout the ref
             repo.git.checkout(ref)
 
-            # Parse the module
-            full_module_path = repo_path / module_path
-            if not full_module_path.exists():
-                print(f"Module path {module_path} does not exist in ref {ref}")
-                return None
+            summaries = []
+            
+            # Find all module paths
+            module_paths = self._find_module_paths(
+                repo_path, module_path, repo_config.recursive
+            )
+            
+            for mod_path in module_paths:
+                try:
+                    parser = TerraformParser(str(mod_path))
+                    # Calculate relative path from repo root
+                    relative_path = str(mod_path.relative_to(repo_path))
+                    summary = parser.parse_module(repo_config.url, ref, relative_path)
+                    if summary:
+                        summaries.append(summary)
+                except Exception as e:
+                    print(f"Error parsing module at {mod_path}: {e}")
 
-            parser = TerraformParser(str(full_module_path))
-            summary = parser.parse_module(repo_config.url, ref)
-
-            return summary
+            return summaries
         except Exception as e:
             print(f"Error processing ref {ref}: {e}")
-            return None
+            return []
+
+    def _find_module_paths(
+        self, repo_path: Path, module_path: str, recursive: bool = False
+    ) -> List[Path]:
+        """Find all terraform module paths."""
+        full_module_path = repo_path / module_path
+        if not full_module_path.exists():
+            print(f"Module path {module_path} does not exist")
+            return []
+
+        module_paths = []
+        
+        if recursive:
+            # Recursively find all directories containing terraform files
+            for root, dirs, files in os.walk(full_module_path):
+                root_path = Path(root)
+                # Check if this directory contains terraform files
+                if self._is_terraform_module(root_path):
+                    module_paths.append(root_path)
+        else:
+            # Only check the specified path
+            if self._is_terraform_module(full_module_path):
+                module_paths.append(full_module_path)
+
+        return module_paths
+
+    def _is_terraform_module(self, path: Path) -> bool:
+        """Check if a directory contains terraform files."""
+        tf_files = list(path.glob("*.tf"))
+        return len(tf_files) > 0
 
     def _get_tags(self, repo: git.Repo, max_tags: Optional[int] = None) -> List[str]:
         """Get a list of tags from the repository."""
