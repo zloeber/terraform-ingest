@@ -12,4 +12,5 @@ yq = "latest"
 jq = 'latest'
 yamllint = "1.37.1"
 terraform = "latest"
+node = "latest"
 

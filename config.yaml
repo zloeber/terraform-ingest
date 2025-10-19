@@ -7,5 +7,6 @@ repositories:
   max_tags: 1
   path: modules/aws
   recursive: true
+  ignore_default_branch: true
 output_dir: ./output
 clone_dir: ./repos

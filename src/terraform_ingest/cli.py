@@ -2,13 +2,15 @@
 
 import click
 import json
+import shutil
 from pathlib import Path
-from .ingest import TerraformIngest
-from .models import IngestConfig
+from terraform_ingest.ingest import TerraformIngest
+from terraform_ingest.models import IngestConfig
+from terraform_ingest import __version__, SCRIPT_PATH, CONFIG_PATH
 
 
 @click.group()
-@click.version_option(version="0.1.0")
+@click.version_option(version=__version__)
 def cli():
     """Terraform Ingest - A terraform multi-repo module AI RAG ingestion engine.
     
@@ -17,19 +19,18 @@ def cli():
     """
     pass
 
-
 @cli.command()
-@click.argument("config_file", type=click.Path(exists=True), default="config.yaml")
+@click.argument("config_file", type=click.Path(exists=True), default=CONFIG_PATH)
 @click.option(
     "--output-dir",
     "-o",
-    default="./output",
+    default=None,
     help="Directory to save JSON summaries",
 )
 @click.option(
     "--clone-dir",
     "-c",
-    default="./repos",
+    default=None,
     help="Directory to clone repositories",
 )
 @click.option(
@@ -59,17 +60,21 @@ def ingest(config_file, output_dir, clone_dir, cleanup, no_cache):
         ingester = TerraformIngest.from_yaml(config_file)
         
         # Override config if command-line options are provided
-        if output_dir != "./output":
+        if output_dir is not None:
             ingester.config.output_dir = output_dir
             ingester.output_dir = Path(output_dir)
-            if no_cache:
-                ingester.output_dir.rmdir()
-            ingester.output_dir.mkdir(parents=True, exist_ok=True)
 
-        if clone_dir != "./repos":
+
+        if clone_dir is not None:
             ingester.config.clone_dir = clone_dir
             ingester.repo_manager.clone_dir = Path(clone_dir)
-            ingester.repo_manager.clone_dir.mkdir(parents=True, exist_ok=True)
+
+        if no_cache:
+            shutil.rmtree(ingester.output_dir, ignore_errors=True)
+            shutil.rmtree(ingester.repo_manager.clone_dir, ignore_errors=True)
+
+        ingester.output_dir.mkdir(parents=True, exist_ok=True)
+        ingester.repo_manager.clone_dir.mkdir(parents=True, exist_ok=True)
 
         click.echo("Starting ingestion...")
         summaries = ingester.ingest()
@@ -117,7 +122,12 @@ def ingest(config_file, output_dir, clone_dir, cleanup, no_cache):
     default=True,
     help="Recursively search for terraform modules in subdirectories",
 )
-def analyze(repository_url, branch, output, include_tags, max_tags, recursive):
+@click.option(
+    "--ignore-default-branch/--include-default-branch",
+    default=False,
+    help="Ignore the default branch when processing",
+)
+def analyze(repository_url, branch, output, include_tags, max_tags, recursive, ignore_default_branch):
     """Analyze a single terraform repository.
     
     REPOSITORY_URL: Git URL of the repository to analyze.
@@ -140,6 +150,7 @@ def analyze(repository_url, branch, output, include_tags, max_tags, recursive):
             include_tags=include_tags,
             max_tags=max_tags,
             recursive=recursive,
+            ignore_default_branch=ignore_default_branch,
         )
         
         config = IngestConfig(

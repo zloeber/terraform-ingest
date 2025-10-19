@@ -42,7 +42,6 @@ htmlcov/
 # Terraform Ingest specific
 repos/
 output/
-*.json
 
 # Temp files
 .DS_Store
@@ -54,3 +53,4 @@ _version.py
 
 # app specific
 output/
+.env

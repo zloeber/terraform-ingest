@@ -1,0 +1,12 @@
+{
+	"nanocoder": {
+		"providers": [
+			{
+				"name": "OpenRouter",
+				"baseUrl": "https://openrouter.ai/api/v1",
+				"apiKey": "${OPENAI_API_KEY}",
+				"models": ["qwen/qwen3-coder:free"]
+			}
+		]
+	}
+}

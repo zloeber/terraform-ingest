@@ -35,8 +35,19 @@ class RepositoryManager:
         # Clone or update repository
         repo = self._clone_or_update(repo_config.url, repo_path)
 
+        # Get default branch if ignore_default_branch is enabled
+        default_branch = None
+        if repo_config.ignore_default_branch:
+            default_branch = self._get_default_branch(repo)
+            print(f"Default branch detected: {default_branch}")
+
         # Process branches
         for branch in repo_config.branches:
+            # Skip if this is the default branch and ignore_default_branch is True
+            if repo_config.ignore_default_branch and branch == default_branch:
+                print(f"Skipping default branch: {branch}")
+                continue
+                
             try:
                 branch_summaries = self._process_ref(
                     repo, repo_config, branch, repo_path, repo_config.path
@@ -155,6 +166,36 @@ class RepositoryManager:
         except Exception as e:
             print(f"Error getting tags: {e}")
             return []
+
+    def _get_default_branch(self, repo: git.Repo) -> Optional[str]:
+        """Get the default branch of the repository."""
+        try:
+            # Try to get the default branch from origin
+            if hasattr(repo.remotes.origin, 'refs'):
+                for ref in repo.remotes.origin.refs:
+                    if ref.name == 'origin/HEAD':
+                        # Extract branch name from origin/HEAD -> origin/main
+                        return ref.ref.name.split('/')[-1]
+            
+            # Fallback: try common default branch names
+            common_defaults = ['main', 'master', 'develop', 'dev']
+            for branch_name in common_defaults:
+                try:
+                    if f'origin/{branch_name}' in [ref.name for ref in repo.remotes.origin.refs]:
+                        return branch_name
+                except:
+                    continue
+                    
+            # If all else fails, try to get the active branch
+            try:
+                return repo.active_branch.name
+            except:
+                pass
+                
+            return None
+        except Exception as e:
+            print(f"Error getting default branch: {e}")
+            return None
 
     def cleanup(self):
         """Clean up cloned repositories."""

@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from fastmcp import FastMCP
 
-from .models import TerraformModuleSummary
+from terraform_ingest.models import TerraformModuleSummary
 
 # Initialize FastMCP server
 mcp = FastMCP("terraform-ingest")
