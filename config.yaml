@@ -4,7 +4,7 @@ repositories:
   branches:
     - main
   include_tags: true
-  max_tags: 5
+  max_tags: 1
   path: modules/aws
   recursive: true
 output_dir: ./output

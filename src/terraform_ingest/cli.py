@@ -37,7 +37,12 @@ def cli():
     default=False,
     help="Clean up cloned repositories after ingestion",
 )
-def ingest(config_file, output_dir, clone_dir, cleanup):
+@click.option(
+    "--no-cache/--cache",
+    default=False,
+    help="Disable caching for module analysis",
+)
+def ingest(config_file, output_dir, clone_dir, cleanup, no_cache):
     """Ingest terraform repositories from a YAML configuration file.
     
     CONFIG_FILE: Path to the YAML configuration file containing repository sources.
@@ -57,8 +62,10 @@ def ingest(config_file, output_dir, clone_dir, cleanup):
         if output_dir != "./output":
             ingester.config.output_dir = output_dir
             ingester.output_dir = Path(output_dir)
+            if no_cache:
+                ingester.output_dir.rmdir()
             ingester.output_dir.mkdir(parents=True, exist_ok=True)
-            
+
         if clone_dir != "./repos":
             ingester.config.clone_dir = clone_dir
             ingester.repo_manager.clone_dir = Path(clone_dir)
