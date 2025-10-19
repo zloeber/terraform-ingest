@@ -5,6 +5,7 @@ requires-python = ">=3.13"
 dependencies = [
     "click>=8.3.0",
     "fastapi>=0.119.0",
+    "fastmcp>=0.5.0",
     "gitpython>=3.1.45",
     "httpx>=0.28.1",
     "pydantic>=2.12.2",
@@ -43,6 +44,7 @@ version-file = "_version.py"
 
 [project.scripts]
 terraform-ingest = "terraform_ingest.cli:main"
+terraform-ingest-mcp = "terraform_ingest.mcp_service:main"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

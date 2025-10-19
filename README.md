@@ -8,6 +8,7 @@ A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file o
 - 🔍 **Comprehensive Analysis**: Extracts variables, outputs, providers, modules, and descriptions
 - 🏷️ **Branch & Tag Support**: Analyzes both branches and git tags
 - 🔌 **Dual Interface**: Use as a CLI tool (Click) or as a REST API service (FastAPI)
+- 🤖 **MCP Integration**: FastMCP service for AI agent access to ingested modules
 - 📊 **JSON Output**: Generates structured JSON summaries ready for RAG ingestion
 - 🔐 **Credential Support**: Uses existing git credentials for private repositories
 
@@ -62,6 +63,85 @@ Save output to file:
 
 ```bash
 terraform-ingest analyze https://github.com/user/terraform-module -o output.json
+```
+
+### MCP Service for AI Agents
+
+The FastMCP service exposes ingested Terraform modules to AI agents through the Model Context Protocol (MCP). This allows AI assistants to query and discover Terraform modules from your ingested repositories.
+
+#### Start the MCP Server
+
+```bash
+terraform-ingest-mcp
+```
+
+The server will start and expose two tools:
+
+1. **list_repositories**: Lists all accessible Git repositories containing Terraform modules
+2. **search_modules**: Searches for Terraform modules by name, provider, or keywords
+
+#### MCP Tools
+
+**list_repositories**
+```python
+# Lists all repositories with metadata
+list_repositories(
+    filter="aws",           # Optional: filter by keyword
+    limit=50,               # Optional: max results (default: 50)
+    output_dir="./output"   # Optional: path to JSON summaries
+)
+```
+
+Returns repository information including:
+- URL and name
+- Description
+- Branches/tags analyzed
+- Module count
+- Providers used
+
+**search_modules**
+```python
+# Search for modules
+search_modules(
+    query="vpc",                    # Required: search term
+    repo_urls=["https://..."],      # Optional: specific repos
+    provider="aws",                 # Optional: filter by provider
+    output_dir="./output"           # Optional: path to JSON summaries
+)
+```
+
+Returns detailed module information including:
+- Repository and ref (branch/tag)
+- Variables and outputs
+- Providers and sub-modules
+- README content
+
+#### Example MCP Usage
+
+Once the MCP server is running, AI agents can use it to:
+
+1. **Discover Available Modules**:
+   - "What Terraform modules are available for AWS?"
+   - "Show me all modules that use the azurerm provider"
+
+2. **Search for Specific Functionality**:
+   - "Find modules that create VPCs"
+   - "Search for modules with security group configurations"
+
+3. **Analyze Module Details**:
+   - "What are the inputs for the AWS VPC module?"
+   - "Show me the outputs from the network module"
+
+#### Configuring Output Directory
+
+The MCP service reads from the directory where ingested JSON summaries are stored. By default, this is `./output`. You can specify a different directory:
+
+```bash
+# Set via environment variable
+export TERRAFORM_INGEST_OUTPUT_DIR=/path/to/output
+
+# Or pass directly to tools in MCP calls
+list_repositories(output_dir="/custom/path")
 ```
 
 ### API Service
