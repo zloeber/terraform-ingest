@@ -127,11 +127,6 @@ def ingest(config_file, output_dir, clone_dir, cleanup, no_cache):
     default=True,
     help="Recursively search for terraform modules in subdirectories",
 )
-@click.option(
-    "--ignore-default-branch/--include-default-branch",
-    default=False,
-    help="Ignore the default branch when processing",
-)
 def analyze(
     repository_url,
     branch,
@@ -139,7 +134,6 @@ def analyze(
     include_tags,
     max_tags,
     recursive,
-    ignore_default_branch,
 ):
     """Analyze a single terraform repository.
 
@@ -161,7 +155,6 @@ def analyze(
             include_tags=include_tags,
             max_tags=max_tags,
             recursive=recursive,
-            ignore_default_branch=ignore_default_branch,
         )
 
         config = IngestConfig(

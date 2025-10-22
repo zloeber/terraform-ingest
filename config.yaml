@@ -7,21 +7,17 @@ repositories:
     name: terraform-aws-vpc
     branches:
       - main
-      - master
     include_tags: true
     max_tags: 2
     path: .
     recursive: false
-    ignore_default_branch: false  # Process all specified branches including default
 
-  # Example: AWS EC2 Terraform module with default branch ignored
+  # Example: AWS EC2 Terraform module
   - url: https://github.com/terraform-aws-modules/terraform-aws-ec2-instance
     name: terraform-aws-ec2
     branches:
       - main
-      - develop
     include_tags: true
-    ignore_default_branch: true   # Skip the repository's default branch
     max_tags: 1
     path: .
 

@@ -63,7 +63,6 @@ class RepositoryConfig(BaseModel):
     max_tags: Optional[int] = 10
     path: str = "."
     recursive: bool = False
-    ignore_default_branch: bool = False
 
 
 class McpConfig(BaseModel):

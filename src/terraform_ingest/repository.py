@@ -23,6 +23,10 @@ class RepositoryManager:
         """Process a repository and return summaries for all refs."""
         summaries = []
 
+        if len(repo_config.branches) == 0 and not repo_config.include_tags:
+            print("No branches or tags specified to process.")
+            return summaries
+
         # Determine repository name
         repo_name = repo_config.name
         if not repo_name:
@@ -35,27 +39,15 @@ class RepositoryManager:
         # Clone or update repository
         repo = self._clone_or_update(repo_config.url, repo_path)
 
-        # Get default branch if ignore_default_branch is enabled
-        default_branch = None
-        if repo_config.ignore_default_branch:
-            default_branch = self._get_default_branch(repo)
-            print(f"Default branch detected: {default_branch}")
-
         # Process branches
         for branch in repo_config.branches:
-            # Skip if this is the default branch and ignore_default_branch is True
-            if repo_config.ignore_default_branch and branch == default_branch:
-                print(f"Skipping default branch: {branch}")
-                continue
-            elif branch == default_branch:
-                print(f"Processing default branch: {branch}")
-                try:
-                    branch_summaries = self._process_ref(
-                        repo, repo_config, branch, repo_path, repo_config.path
-                    )
-                    summaries.extend(branch_summaries)
-                except Exception as e:
-                    print(f"Error processing branch {branch}: {e}")
+            try:
+                branch_summaries = self._process_ref(
+                    repo, repo_config, branch, repo_path, repo_config.path
+                )
+                summaries.extend(branch_summaries)
+            except Exception as e:
+                print(f"Error processing branch {branch}: {e}")
 
         # Process tags if enabled
         if repo_config.include_tags:
@@ -97,11 +89,30 @@ class RepositoryManager:
         module_path: str = ".",
     ) -> List[TerraformModuleSummary]:
         """Process a specific git ref (branch or tag)."""
+
+        summaries = []
+
+        # Validate that the ref exists in the repository
+        try:
+            # Check if ref exists in remote branches
+            remote_refs = [ref.name for ref in repo.remotes.origin.refs]
+            local_refs = [ref.name for ref in repo.refs]
+
+            # For branches, check if origin/{ref} exists
+            if f"origin/{ref}" not in remote_refs and ref not in local_refs:
+                # For tags, check if ref exists in tags
+                tag_names = [tag.name for tag in repo.tags]
+                if ref not in tag_names:
+                    print(f"Ref '{ref}' does not exist in repository")
+                    return []
+
+            print(f"Processing ref: {ref}")
+        except Exception as e:
+            print(f"Error validating ref {ref}: {e}")
+            return summaries
         try:
             # Checkout the ref
             repo.git.checkout(ref)
-
-            summaries = []
 
             # Find all module paths
             module_paths = self._find_module_paths(

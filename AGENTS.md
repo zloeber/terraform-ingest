@@ -30,7 +30,7 @@ A FastAPI/Click-based Python application that ingests multiple Terraform reposit
 2. **MCP Service** (`mcp_service.py`) reads JSON outputs and exposes them to AI agents via FastMCP
 
 ### Key Models (models.py)
-- `RepositoryConfig`: Git repo settings (url, branches, recursive, ignore_default_branch)  
+- `RepositoryConfig`: Git repo settings (url, branches, recursive)  
 - `TerraformModuleSummary`: Parsed module data (variables, outputs, providers, modules)
 - `IngestConfig`: Top-level configuration container
 
