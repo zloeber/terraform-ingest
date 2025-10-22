@@ -334,6 +334,31 @@ def _start_periodic_ingestion(config: IngestConfig):
         f"Started periodic ingestion thread (every {config.mcp.refresh_interval_hours}h)"
     )
 
+def start(config_file: str = None):
+    """Run the FastMCP server."""
+    # Check for MCP configuration and auto-ingestion
+    if config_file is None:
+        config_file = os.getenv("TERRAFORM_INGEST_CONFIG", "config.yaml")
+
+    config = _load_config_file(config_file)
+
+    if config and config.mcp:
+        mcp_config = config.mcp
+
+    print(f"MCP Configuration File: {config_file}")
+    print(f"MCP Config: {mcp_config}")
+
+    # Run ingestion on startup if enabled
+    if mcp_config.auto_ingest and mcp_config.ingest_on_startup:
+        print("MCP auto-ingestion enabled, running initial ingestion...")
+        _run_ingestion(mcp_config.config_file)
+
+    # Start periodic ingestion if configured
+    if mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
+        _start_periodic_ingestion(config)
+
+    print("Starting FastMCP server...")
+    mcp.run()
 
 def main():
     """Run the FastMCP server."""

@@ -6,7 +6,7 @@ repositories:
   - url: https://github.com/terraform-aws-modules/terraform-aws-vpc
     name: terraform-aws-vpc
     branches:
-      - main
+      - master
     include_tags: true
     max_tags: 2
     path: .
@@ -15,8 +15,7 @@ repositories:
   # Example: AWS EC2 Terraform module
   - url: https://github.com/terraform-aws-modules/terraform-aws-ec2-instance
     name: terraform-aws-ec2
-    branches:
-      - main
+    branches: []
     include_tags: true
     max_tags: 1
     path: .

@@ -11,7 +11,7 @@ from terraform_ingest.models import RepositoryConfig
 from terraform_ingest.ingest import TerraformIngest
 from terraform_ingest.models import IngestConfig
 from terraform_ingest import __version__, CONFIG_PATH
-from terraform_ingest.mcp_service import main as mcp_main
+from terraform_ingest.mcp_service import start as mcp_main
 
 
 @click.group()
@@ -260,13 +260,7 @@ def serve(host, port):
     default=None,
     help="Configuration file for auto-ingestion settings",
 )
-@click.option(
-    "--show",
-    is_flag=True,
-    help="Show current MCP configuration and exit",
-    default=False,
-)
-def mcp(config, show):
+def mcp(config):
     """Start the MCP (Model Context Protocol) server.
 
     The MCP server exposes ingested Terraform modules to AI agents and supports
@@ -284,14 +278,12 @@ def mcp(config, show):
     else:
         config = os.getenv("TERRAFORM_INGEST_CONFIG", "config.yaml")
         os.environ["TERRAFORM_INGEST_CONFIG"] = config
-    if show:
-        click.echo(f"MCP Configuration File: {config}")
-        return
+
     click.echo(f"Starting MCP server with config: {config}")
     click.echo("Press CTRL+C to quit")
 
     try:
-        mcp_main()
+        mcp_main(config_file=config)
     except KeyboardInterrupt:
         click.echo("\nMCP server stopped")
 
