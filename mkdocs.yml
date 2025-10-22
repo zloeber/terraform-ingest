@@ -1,0 +1,39 @@
+site_name: Terraform Ingest Documentation
+site_description: Documentation for the Terraform Ingest
+site_url: https://zloeber.github.io/terraform-ingest/
+theme:
+  palette:
+    scheme: slate
+  name: material
+nav:
+  - 'index.md'
+  - 'Docker': 'DOCKER.md'
+  - 'Quickstart': 'QUICKSTART.md'
+  - 'Docker': 'DOCKER.md'
+  - 'MCP': 'MCP.md'
+
+markdown_extensions:
+  - mkdocs-click
+  - admonition         # Adds boxes for Notes, Warnings, etc.
+  - attr_list          # Adds attribute lists to generated HTML
+  - codehilite         # Syntax coloring for code blocks
+  - def_list           # Adds syntax for definition lists
+  - sane_lists         # Enables list items with multiple paragraphs
+  - toc:               # Builds a table of contents
+      permalink: "#"   # Puts a "#" at the end of each header
+  - pymdownx.superfences:
+        # make exceptions to highlighting of code:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+plugins:
+- llmstxt:
+    markdown_description: Documentation for the Metagit-AI CLI project
+    full_output: llms-full.txt
+    sections:
+      Usage documentation:
+      - index.md: Index
+      - QUICKSTART.md: Quickstart Guide
+      - DOCKER.md: Docker usage
+      - MCP.md: MCP Server usage

@@ -54,3 +54,5 @@ _version.py
 # app specific
 output/
 .env
+site/
+config.client.yaml

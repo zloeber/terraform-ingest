@@ -1,7 +1,24 @@
-# Copilot Instructions for terraform-ingest
+# Instructions for terraform-ingest
 
 ## Project Overview
 A FastAPI/Click-based Python application that ingests multiple Terraform repositories from YAML configuration, analyzes modules across branches/tags, and outputs JSON summaries for AI RAG systems. Also exposes an MCP (Model Context Protocol) service for AI agents.
+
+## Rules
+- Before running any command, check the current terminal context and use that same terminal ID for all subsequent commands.
+- All documentation created to meet a specific feature request must be created in the ./docs folder with a filename that matches the feature request title in snake_case and ends with _FEATURE.md. For example, a feature request titled "Add User Authentication" would have documentation created in ./docs/add_user_authentication_FEATURE.md.
+- Do not run multiple line python commands in a single execution, instead create temporary scripts if needed and run them as single commands.
+
+## Code Style Guidelines
+- Follow PEP 8 style guide
+- Use snake_case for variables and functions
+- Use PascalCase for classes
+- Include docstrings for functions and classes
+- Use type hints where appropriate
+- Use f-strings for string formatting
+- Use `pathlib.Path` for file system operations
+- Use `click` for CLI commands and options
+- Use `pydantic` for data models and validation
+- All imports should be at the top of the file, grouped by standard library, third-party, and local imports
 
 ## Architecture Components
 
@@ -69,6 +86,3 @@ terraform-ingest-mcp
 - Pydantic model validation in `test_models.py`  
 - Use `pytest` fixtures for sample configurations
 - Mock git operations for reproducible tests
-
-## Tool Usage Notes
-- When using 'run_in_terminal' tool the parameter 'isBackground' should always be set to false if it is available.

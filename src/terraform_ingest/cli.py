@@ -1,13 +1,17 @@
 """Command-line interface for terraform-ingest."""
 
+import os
 import click
 import json
 import shutil
+import yaml
+
 from pathlib import Path
+from terraform_ingest.models import RepositoryConfig
 from terraform_ingest.ingest import TerraformIngest
 from terraform_ingest.models import IngestConfig
 from terraform_ingest import __version__, SCRIPT_PATH, CONFIG_PATH
-
+from terraform_ingest.mcp_service import main as mcp_main
 
 @click.group()
 @click.version_option(version=__version__)
@@ -138,8 +142,6 @@ def analyze(repository_url, branch, output, include_tags, max_tags, recursive, i
     
         terraform-ingest analyze https://github.com/user/terraform-module -b develop --include-tags
     """
-    from .models import RepositoryConfig
-    
     click.echo(f"Analyzing repository: {repository_url}")
 
     try:
@@ -189,8 +191,6 @@ def init(config_file):
     
         terraform-ingest init config.yaml
     """
-    import yaml
-    
     config_path = Path(config_file)
     
     if config_path.exists():
@@ -249,6 +249,49 @@ def serve(host, port):
     click.echo("Press CTRL+C to quit")
     
     uvicorn.run(app, host=host, port=port)
+
+
+@cli.command()
+@click.option(
+    "--config",
+    "-c",
+    default=None,
+    help="Configuration file for auto-ingestion settings",
+)
+@click.option(
+    "--show",
+    is_flag=True,
+    help="Show current MCP configuration and exit",
+    default=False,
+)
+def mcp(config, show):
+    """Start the MCP (Model Context Protocol) server.
+    
+    The MCP server exposes ingested Terraform modules to AI agents and supports
+    auto-ingestion based on configuration settings.
+    
+    Example:
+    
+        terraform-ingest mcp
+        
+        terraform-ingest mcp --config my-config.yaml
+    """
+    # Set the config file environment variable if provided
+    if config is not None:
+        os.environ["TERRAFORM_INGEST_CONFIG"] = config
+    else:
+        config = os.getenv("TERRAFORM_INGEST_CONFIG", "config.yaml")
+        os.environ["TERRAFORM_INGEST_CONFIG"] = config
+    if show:
+        click.echo(f"MCP Configuration File: {config}")
+        return
+    click.echo(f"Starting MCP server with config: {config}")
+    click.echo("Press CTRL+C to quit")
+    
+    try:
+        mcp_main()
+    except KeyboardInterrupt:
+        click.echo("\nMCP server stopped")
 
 
 def main():

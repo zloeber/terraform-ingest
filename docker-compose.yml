@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # CLI Mode Example
+  # ============================================================================
+  # Run with: docker-compose run --rm terraform-ingest-cli ingest /app/config/config.yaml
+  terraform-ingest-cli:
+    build:
+      context: .
+      target: cli
+    container_name: terraform-ingest-cli
+    volumes:
+      - ./config.yaml:/app/config/config.yaml:ro
+      - ./output:/app/output
+      - ./repos:/app/repos
+      - ~/.ssh:/root/.ssh:ro  # For private repo access via SSH keys
+    environment:
+      - TERRAFORM_INGEST_CONFIG=/app/config/config.yaml
+    profiles:
+      - cli
+    stdin_open: true
+    tty: true
+
+  # ============================================================================
+  # API Mode Example
+  # ============================================================================
+  # Run with: docker-compose up terraform-ingest-api
+  # Access API at: http://localhost:8000
+  terraform-ingest-api:
+    build:
+      context: .
+      target: api
+    container_name: terraform-ingest-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config.yaml:/app/config/config.yaml:ro
+      - ./output:/app/output
+      - ./repos:/app/repos
+      - ~/.ssh:/root/.ssh:ro  # For private repo access via SSH keys
+    environment:
+      - TERRAFORM_INGEST_CONFIG=/app/config/config.yaml
+      - UVICORN_HOST=0.0.0.0
+      - UVICORN_PORT=8000
+      - UVICORN_LOG_LEVEL=info
+      - UVICORN_RELOAD=false
+    profiles:
+      - api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # ============================================================================
+  # MCP Server Mode Example
+  # ============================================================================
+  # Run with: docker-compose up terraform-ingest-mcp
+  terraform-ingest-mcp:
+    build:
+      context: .
+      target: mcp
+    container_name: terraform-ingest-mcp
+    volumes:
+      - ./config.yaml:/app/config/config.yaml:ro
+      - ./output:/app/output
+      - ./repos:/app/repos
+      - ~/.ssh:/root/.ssh:ro  # For private repo access via SSH keys
+    environment:
+      - TERRAFORM_INGEST_CONFIG=/app/config/config.yaml
+      - TERRAFORM_INGEST_MCP_AUTO_INGEST=true
+      - TERRAFORM_INGEST_MCP_INGEST_ON_STARTUP=false
+      - TERRAFORM_INGEST_MCP_REFRESH_INTERVAL_HOURS=24
+    profiles:
+      - mcp
+    restart: unless-stopped
+    # Stdin/stdout for MCP protocol communication
+    stdin_open: true
+    tty: true
+
+  # ============================================================================
+  # Development Mode Example
+  # ============================================================================
+  # Run with: docker-compose up -d terraform-ingest-dev
+  # Then: docker-compose exec terraform-ingest-dev bash
+  terraform-ingest-dev:
+    build:
+      context: .
+      target: dev
+    container_name: terraform-ingest-dev
+    volumes:
+      - .:/app
+      - ~/.ssh:/root/.ssh:ro  # For private repo access via SSH keys
+      - /app/.venv  # Prevent volume mount from overriding venv
+    environment:
+      - TERRAFORM_INGEST_CONFIG=/app/config/config.yaml
+      - PYTHONUNBUFFERED=1
+    profiles:
+      - dev
+    stdin_open: true
+    tty: true
+
+# Define named volumes for shared data
+volumes:
+  terraform-output:
+  terraform-repos:

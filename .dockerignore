@@ -1,0 +1,68 @@
+# Git
+#.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pyc
+.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv
+venv/
+env/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+.editorconfig
+
+# Testing
+.pytest_cache
+.coverage
+.mypy_cache
+htmlcov/
+test_output/
+*.pytest_cache
+
+# Project specific
+repos/
+output/
+*.terraform
+.terraform
+.terraformrc
+
+# Documentation
+#docs/
+
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.gitea
+
+# Misc
+*.log
+.env
+.env.local
+Taskfile.yml
+configure.sh
+#hatch.toml
+.mise.toml
+.nanocoder/
+agents.config.json
+output/
+.env
+site/
+config.client.yaml

@@ -34,11 +34,12 @@ dev = [
     "pytest-cov>=7.0.0",
 ]
 
-# [tool.setuptools_scm]
-# version_file = "src/terraform_ingest/_version.py"
-
 [tool.hatch.version]
 source = "vcs"
+fallback-version = "0.0.1"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/terraform_ingest/_version.py"
@@ -51,6 +52,11 @@ terraform-ingest-mcp = "terraform_ingest.mcp_service:main"
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
-# [tool.hatch.build.targets.sdist]
-# include = ["/src/terraform_ingest", "/README.md", "/pyproject.toml"]
-
+[project.optional-dependencies]
+standard = []
+test = ["pytest", "pytest-cov", "mypy", "ruff", "httpx", "pytest-asyncio", "black"]
+dev = ["ruff", "black", "isort", "mypy"]
+docs = ["mkdocs", "mkdocs-material", "mkdocstrings", "mkdocs-click", "mdtoc", "mkdocs-mermaid2-plugin", "mkdocs-material", "mkdocs-llmstxt"]
+lint = ["ruff", "black", "isort", "mypy"]
+format = ["black", "isort"]
+typecheck = ["mypy"]

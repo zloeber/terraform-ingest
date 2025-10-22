@@ -1,5 +1,0 @@
-[version]
-source = "vcs"
-
-[build.hooks.vcs]
-version-file = "src/terraform_ingest/_version.py"

@@ -30,3 +30,10 @@ output_dir: ./output
 
 # Directory for cloning repositories
 clone_dir: ./repos
+
+# MCP (Model Context Protocol) service configuration
+mcp:
+  auto_ingest: true               # Enable automatic ingestion when MCP server starts
+  ingest_on_startup: true         # Run ingestion immediately on startup  
+  refresh_interval_hours: 6       # Auto-refresh every 6 hours (null to disable)
+  config_file: config.yaml        # Configuration file to use for auto-ingestion

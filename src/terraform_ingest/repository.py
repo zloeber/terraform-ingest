@@ -47,14 +47,15 @@ class RepositoryManager:
             if repo_config.ignore_default_branch and branch == default_branch:
                 print(f"Skipping default branch: {branch}")
                 continue
-                
-            try:
-                branch_summaries = self._process_ref(
-                    repo, repo_config, branch, repo_path, repo_config.path
-                )
-                summaries.extend(branch_summaries)
-            except Exception as e:
-                print(f"Error processing branch {branch}: {e}")
+            elif branch == default_branch:
+                print(f"Processing default branch: {branch}")
+                try:
+                    branch_summaries = self._process_ref(
+                        repo, repo_config, branch, repo_path, repo_config.path
+                    )
+                    summaries.extend(branch_summaries)
+                except Exception as e:
+                    print(f"Error processing branch {branch}: {e}")
 
         # Process tags if enabled
         if repo_config.include_tags:
@@ -178,7 +179,7 @@ class RepositoryManager:
                         return ref.ref.name.split('/')[-1]
             
             # Fallback: try common default branch names
-            common_defaults = ['main', 'master', 'develop', 'dev']
+            common_defaults = ['main', 'master']
             for branch_name in common_defaults:
                 try:
                     if f'origin/{branch_name}' in [ref.name for ref in repo.remotes.origin.refs]:

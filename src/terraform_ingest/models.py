@@ -60,8 +60,17 @@ class RepositoryConfig(BaseModel):
     ignore_default_branch: bool = False
 
 
+class McpConfig(BaseModel):
+    """Configuration for the MCP (Model Context Protocol) service."""
+    auto_ingest: bool = False
+    ingest_on_startup: bool = False
+    refresh_interval_hours: Optional[int] = None
+    config_file: str = "config.yaml"
+
+
 class IngestConfig(BaseModel):
     """Configuration for the ingestion process."""
     repositories: List[RepositoryConfig]
     output_dir: str = "./output"
     clone_dir: str = "./repos"
+    mcp: Optional[McpConfig] = None

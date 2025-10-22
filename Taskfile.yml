@@ -1,18 +1,12 @@
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
 
-## NOTE: Don't update this file if you are syncing via vendir.
-##       Create/update ./Taskfile.custom.yml instead!
 version: "3"
 silent: true
-vars:
-  TARGET:
-    sh: 'echo "${TARGET:-"default"}"'
-  PROFILE:
-    sh: 'echo "${PROFILE:-"default"}"'
+env:
   PROJECT:
     sh: 'echo "$(basename $(pwd))"'
-  PYTHON_VENV_PATH: "{{.ROOT_DIR}}/.venv"
-  LOCAL_BIN_PATH: "{{.PYTHON_VENV_PATH}}/bin"
+  LOCAL_BIN_PATH:
+    sh: 'echo "{{.ROOT_DIR}}/.venv/bin"'
   BUILD_DATE:
     sh: "date '+%Y-%m-%d-%H:%M:%S'"
   BUILD_DATE_SHORT:
@@ -21,33 +15,39 @@ vars:
     sh: 'git tag -l 2>/dev/null | sort -r -V | head -n 1 2>/dev/null || echo "not a git repo"'
   TERM: screen-256color
   DOCS_PATH: "{{.ROOT_DIR}}/docs"
+  PYTHON_VENV_PATH: "{{.ROOT_DIR}}/.venv"
   SCRIPT_PATH: "{{.ROOT_DIR}}/scripts"
   VERSION: '{{default "unknown" .GIT_LATEST_TAG}}'
+  COMPOSE_BAKE: true
 
 dotenv:
   - ".env"
 
 includes:
+  docker:
+    taskfile: ./tasks/Taskfile.docker.yml
+    optional: true
   github:
     taskfile: ./tasks/Taskfile.github.yml
     optional: true
+
 tasks:
   default:
     cmds:
-      - task -l
+      - |
+        task -l
 
   show:
     desc: Show task variables
     cmds:
       - |
         echo "ROOT_PATH: {{.ROOT_DIR}}"
-        echo "PROFILE: {{.PROFILE}}"
         echo "PROJECT: {{.PROJECT}}"
         echo "VERSION: {{.VERSION}}"
         echo "OS: {{OS}}"
         echo "ARCH: {{ARCH}}"
         echo "LOCAL_BIN_PATH: {{.LOCAL_BIN_PATH}}"
-        echo "DOCS_PATH: {{.DOCS_PATH}}"
+        echo "PYTHON_VENV_PATH: {{.PYTHON_VENV_PATH}}"
         echo "SCRIPT_PATH: {{.SCRIPT_PATH}}"
         echo "BUILD_DATE: {{.BUILD_DATE}}"
         echo "GIT_LATEST_TAG: {{.GIT_LATEST_TAG}}"
@@ -77,6 +77,19 @@ tasks:
           task -l
         fi
 
+  toc:
+    desc: Update the table of contents in README.md
+    cmds:
+      - uv pip install -e ".[docs]"
+      - uv run mdtoc README.md
+
+  secrets:
+    desc: Create template .SECRETS file if one does not already exist.
+    cmds:
+      - cp ./config/.SECRETS.example.env ./.SECRETS.env
+    status:
+      - "test -f .SECRETS.env"
+
   autocomplete:
     desc: Setup task autocomplete (zsh)
     cmds:
@@ -85,3 +98,115 @@ tasks:
     status:
       - "test -f /usr/local/share/zsh/site-functions/_task"
 
+  install:
+    desc: Install everything required to run most scripts.
+    cmds:
+      - |
+        uv sync
+
+  run:
+    desc: Run the app
+    cmds:
+      - |
+        uv run -m metagit_detect.example
+
+  lint:
+    desc: Run python linting
+    cmds:
+      - |
+        uv pip install -e ".[dev]"
+        uv run ruff check .
+        uv run black --check .
+
+  lint:fix:
+    desc: Run python linting and fix issues
+    cmds:
+      - |
+        uv run ruff check --fix .
+
+  format:
+    desc: Run python formatting
+    cmds:
+      - |
+        uv run ruff format .
+        uv run black .
+  
+  start:mcp:
+    desc: Start MCP servers
+    cmds:
+      - |
+        docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN} -e GITHUB_READ_ONLY=1 -e GITHUB_DYNAMIC_TOOLSETS=1 ghcr.io/github/github-mcp-server
+
+  docs:
+    desc: Build the docs
+    cmds:
+      - |
+        uv pip install -e ".[docs]"
+        uv run mdtoc README.md
+        uv run mkdocs build
+
+  test:
+    desc: Run the tests
+    cmds:
+      - |
+        uv pip install -e ".[test]"
+        uv run pytest --maxfail=1 --disable-warnings -v tests
+
+  typecheck:
+    desc: Run the type checker
+    cmds:
+      - |
+        uv pip install -e ".[dev]"
+        uv run mypy metagit/core
+
+  secret:search:
+    desc: Find secrets in the codebase and in git history
+    cmds:
+      - |
+        gitleaks detect --source ./ -f json -r secret_results.json
+  
+  build:
+    desc: Build the project
+    cmds:
+      - |
+        uv build
+
+  clean:
+    desc: Clean the project
+    cmds:
+      - |
+        find . -type d -name "__pycache__" -exec rm -rf {} +
+        find . -type d -name "*.egg-info" -exec rm -rf {} +
+        find . -type f -name ".DS_Store" -delete
+        find . -type f -name "*.pyc" -delete
+        find . -type f -name "*.pyo" -delete
+        rm -rf .mypy_cache
+        rm -rf .pytest_cache
+        rm -rf .ruff_cache
+        rm -rf dist
+        rm -rf .coverage
+        rm -rf .coverage.*
+        rm -rf .coverage.xml
+        rm -rf .DS_Store
+        rm -rf .pytest_cache
+        rm -rf .venv
+        rm -rf src/metagit/_version.py
+
+  deep:clean:
+    desc: Clean the project deeply. Includes uv cache removal.
+    cmds:
+      - uv cache clean
+      - task: clean
+
+  repomix:
+    desc: Run the repo mixin
+    cmds:
+      - |
+        repomix --style=markdown --output=docs/repomix.md --compress
+
+  build:image:
+    desc: Build Docker images
+    cmds:
+      - task: docker:build
+        vars:
+          DOCKER_BUILD_ARGS: "--build-arg DEPLOY_VERSION={{.VERSION}}-$(git rev-parse --short HEAD)"

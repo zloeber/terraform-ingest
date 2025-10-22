@@ -1,12 +1,16 @@
 """FastMCP service for exposing ingested Terraform modules to AI agents."""
 
 import json
+import os
+import threading
+import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from fastmcp import FastMCP
 
-from terraform_ingest.models import TerraformModuleSummary
+from terraform_ingest.models import TerraformModuleSummary, IngestConfig
+from terraform_ingest.ingest import TerraformIngest
 
 # Initialize FastMCP server
 mcp = FastMCP("terraform-ingest")
@@ -271,8 +275,97 @@ def search_modules(
     )
 
 
+# Testable wrapper functions (not decorated with @mcp.tool())
+def _list_repositories_impl(
+    filter: Optional[str] = None,
+    limit: int = 50,
+    output_dir: str = "./output"
+) -> List[Dict[str, Any]]:
+    """Implementation of list_repositories for testing."""
+    service = ModuleQueryService(output_dir)
+    limit = min(limit, 100)
+    return service.list_repositories(filter_keyword=filter, limit=limit)
+
+
+def _search_modules_impl(
+    query: str,
+    repo_urls: Optional[List[str]] = None,
+    provider: Optional[str] = None,
+    output_dir: str = "./output"
+) -> List[Dict[str, Any]]:
+    """Implementation of search_modules for testing."""
+    service = ModuleQueryService(output_dir)
+    return service.search_modules(
+        query=query,
+        repo_urls=repo_urls,
+        provider=provider
+    )
+
+
+def _load_config_file(config_file: str = "config.yaml") -> Optional[IngestConfig]:
+    """Load configuration file if it exists."""
+    config_path = Path(config_file)
+    if not config_path.exists():
+        print(f"Config file {config_file} not found, skipping auto-ingestion")
+        return None
+    
+    try:
+        ingester = TerraformIngest.from_yaml(str(config_path))
+        return ingester.config
+    except Exception as e:
+        print(f"Error loading config file {config_file}: {e}")
+        return None
+
+
+def _run_ingestion(config_file: str = "config.yaml"):
+    """Run ingestion process from configuration file."""
+    try:
+        print(f"Starting auto-ingestion from {config_file}...")
+        ingester = TerraformIngest.from_yaml(config_file)
+        summaries = ingester.ingest()
+        print(f"Auto-ingestion completed: {len(summaries)} modules processed")
+    except Exception as e:
+        print(f"Error during auto-ingestion: {e}")
+
+
+def _start_periodic_ingestion(config: IngestConfig):
+    """Start periodic ingestion in a background thread."""
+    if not config.mcp or not config.mcp.refresh_interval_hours:
+        return
+    
+    def periodic_runner():
+        interval_seconds = config.mcp.refresh_interval_hours * 3600
+        while True:
+            time.sleep(interval_seconds)
+            print(f"Running scheduled ingestion (every {config.mcp.refresh_interval_hours}h)")
+            _run_ingestion(config.mcp.config_file)
+    
+    thread = threading.Thread(target=periodic_runner, daemon=True)
+    thread.start()
+    print(f"Started periodic ingestion thread (every {config.mcp.refresh_interval_hours}h)")
+
+
 def main():
     """Run the FastMCP server."""
+    # Check for MCP configuration and auto-ingestion
+    config_file = os.getenv("TERRAFORM_INGEST_CONFIG", "config.yaml")
+    config = _load_config_file(config_file)
+    
+    if config and config.mcp:
+        mcp_config = config.mcp
+        
+        # Run ingestion on startup if enabled
+        if mcp_config.auto_ingest and mcp_config.ingest_on_startup:
+            print("MCP auto-ingestion enabled, running initial ingestion...")
+            _run_ingestion(mcp_config.config_file)
+        
+        # Start periodic ingestion if configured
+        if mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
+            _start_periodic_ingestion(config)
+    else:
+        print("No MCP configuration found or auto-ingestion disabled")
+    
+    print("Starting FastMCP server...")
     mcp.run()
 
 

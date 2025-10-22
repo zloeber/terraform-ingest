@@ -1,12 +1,39 @@
+# Example configuration for terraform-ingest
+# This file defines the repositories to ingest and processing options
+
 repositories:
-- url: git@gitlab.com:sram/gdo/shared/terraform-modules.git
-  name: aws-shared-terraform-modules
-  branches:
-    - main
-  include_tags: true
-  max_tags: 1
-  path: modules/aws
-  recursive: true
-  ignore_default_branch: true
+  # Example: AWS VPC Terraform module
+  - url: https://github.com/terraform-aws-modules/terraform-aws-vpc
+    name: terraform-aws-vpc
+    branches:
+      - main
+      - master
+    include_tags: true
+    max_tags: 2
+    path: .
+    recursive: false
+    ignore_default_branch: false  # Process all specified branches including default
+
+  # Example: AWS EC2 Terraform module with default branch ignored
+  - url: https://github.com/terraform-aws-modules/terraform-aws-ec2-instance
+    name: terraform-aws-ec2
+    branches:
+      - main
+      - develop
+    include_tags: true
+    ignore_default_branch: true   # Skip the repository's default branch
+    max_tags: 1
+    path: .
+
+# Output directory for JSON summaries
 output_dir: ./output
+
+# Directory for cloning repositories
 clone_dir: ./repos
+
+# MCP (Model Context Protocol) service configuration
+mcp:
+  auto_ingest: true               # Enable automatic ingestion when MCP server starts
+  ingest_on_startup: true         # Run ingestion immediately on startup  
+  refresh_interval_hours: 6       # Auto-refresh every 6 hours (null to disable)
+  config_file: config.yaml        # Configuration file to use for auto-ingestion
