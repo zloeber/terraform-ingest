@@ -7,7 +7,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PROJECT_PATH: src/terraform-ingest
+  PROJECT_PATH: src/terraform_ingest
 
 permissions:
   contents: read
