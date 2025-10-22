@@ -1,11 +1,12 @@
-"""Terraform Ingest - A terraform multi-repo module AI RAG ingestion engine."""
-
+import os
+import pathlib
 
 """
 Compute the version number and store it in the `__version__` variable.
 
 Based on <https://github.com/maresb/hatch-vcs-footgun-example>.
 """
+
 
 def _get_hatch_version():
     """Compute the most up-to-date version number in a development environment.
@@ -47,12 +48,11 @@ def _get_importlib_metadata_version():
     __version__ = version(__package__)
     return __version__
 
-import os
-import pathlib
 
 SCRIPT_PATH = pathlib.Path(__file__).parent.resolve()
 CONFIG_PATH = os.getenv(
-    "TERRAFORM_INGEST_CONFIG", pathlib.Path().joinpath(pathlib.Path().resolve(), ("config.yaml"))
+    "TERRAFORM_INGEST_CONFIG",
+    pathlib.Path().joinpath(pathlib.Path().resolve(), ("config.yaml")),
 )
 
 __version__ = _get_hatch_version() or _get_importlib_metadata_version()

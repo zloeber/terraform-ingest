@@ -102,12 +102,12 @@ class RepositoryManager:
             repo.git.checkout(ref)
 
             summaries = []
-            
+
             # Find all module paths
             module_paths = self._find_module_paths(
                 repo_path, module_path, repo_config.recursive
             )
-            
+
             for mod_path in module_paths:
                 try:
                     parser = TerraformParser(str(mod_path))
@@ -134,7 +134,7 @@ class RepositoryManager:
             return []
 
         module_paths = []
-        
+
         if recursive:
             # Recursively find all directories containing terraform files
             for root, dirs, files in os.walk(full_module_path):
@@ -157,7 +157,9 @@ class RepositoryManager:
     def _get_tags(self, repo: git.Repo, max_tags: Optional[int] = None) -> List[str]:
         """Get a list of tags from the repository."""
         try:
-            tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime, reverse=True)
+            tags = sorted(
+                repo.tags, key=lambda t: t.commit.committed_datetime, reverse=True
+            )
             tag_names = [tag.name for tag in tags]
 
             if max_tags:
@@ -172,27 +174,29 @@ class RepositoryManager:
         """Get the default branch of the repository."""
         try:
             # Try to get the default branch from origin
-            if hasattr(repo.remotes.origin, 'refs'):
+            if hasattr(repo.remotes.origin, "refs"):
                 for ref in repo.remotes.origin.refs:
-                    if ref.name == 'origin/HEAD':
+                    if ref.name == "origin/HEAD":
                         # Extract branch name from origin/HEAD -> origin/main
-                        return ref.ref.name.split('/')[-1]
-            
+                        return ref.ref.name.split("/")[-1]
+
             # Fallback: try common default branch names
-            common_defaults = ['main', 'master']
+            common_defaults = ["main", "master"]
             for branch_name in common_defaults:
                 try:
-                    if f'origin/{branch_name}' in [ref.name for ref in repo.remotes.origin.refs]:
+                    if f"origin/{branch_name}" in [
+                        ref.name for ref in repo.remotes.origin.refs
+                    ]:
                         return branch_name
-                except:
+                except Exception as _:
                     continue
-                    
+
             # If all else fails, try to get the active branch
             try:
                 return repo.active_branch.name
-            except:
+            except Exception as _:
                 pass
-                
+
             return None
         except Exception as e:
             print(f"Error getting default branch: {e}")

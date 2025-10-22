@@ -1,6 +1,5 @@
 """Tests for Terraform parser."""
 
-import pytest
 import tempfile
 from pathlib import Path
 from terraform_ingest.parser import TerraformParser
@@ -18,7 +17,8 @@ def test_parse_variables():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a sample variables.tf
         variables_tf = Path(tmpdir) / "variables.tf"
-        variables_tf.write_text("""
+        variables_tf.write_text(
+            """
 variable "vpc_cidr" {
   description = "CIDR block for VPC"
   type        = string
@@ -29,11 +29,12 @@ variable "enable_dns" {
   description = "Enable DNS support"
   type        = bool
 }
-""")
-        
+"""
+        )
+
         parser = TerraformParser(tmpdir)
         variables = parser._parse_variables()
-        
+
         assert len(variables) == 2
         assert variables[0].name == "vpc_cidr"
         assert variables[0].default == "10.0.0.0/16"
@@ -46,7 +47,8 @@ def test_parse_outputs():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a sample outputs.tf
         outputs_tf = Path(tmpdir) / "outputs.tf"
-        outputs_tf.write_text("""
+        outputs_tf.write_text(
+            """
 output "vpc_id" {
   description = "ID of the VPC"
   value       = aws_vpc.main.id
@@ -55,11 +57,12 @@ output "vpc_id" {
 output "vpc_arn" {
   value = aws_vpc.main.arn
 }
-""")
-        
+"""
+        )
+
         parser = TerraformParser(tmpdir)
         outputs = parser._parse_outputs()
-        
+
         assert len(outputs) == 2
         assert outputs[0].name == "vpc_id"
         assert outputs[0].description == "ID of the VPC"
@@ -71,7 +74,8 @@ def test_parse_providers():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a sample main.tf with provider requirements
         main_tf = Path(tmpdir) / "main.tf"
-        main_tf.write_text("""
+        main_tf.write_text(
+            """
 terraform {
   required_providers {
     aws = {
@@ -80,11 +84,12 @@ terraform {
     }
   }
 }
-""")
-        
+"""
+        )
+
         parser = TerraformParser(tmpdir)
         providers = parser._parse_providers()
-        
+
         assert len(providers) >= 1
         aws_provider = next((p for p in providers if p.name == "aws"), None)
         assert aws_provider is not None
@@ -96,18 +101,20 @@ def test_parse_modules():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a sample main.tf with module references
         main_tf = Path(tmpdir) / "main.tf"
-        main_tf.write_text("""
+        main_tf.write_text(
+            """
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "3.0.0"
   
   name = "my-vpc"
 }
-""")
-        
+"""
+        )
+
         parser = TerraformParser(tmpdir)
         modules = parser._parse_modules()
-        
+
         assert len(modules) == 1
         assert modules[0].name == "vpc"
         assert modules[0].source == "terraform-aws-modules/vpc/aws"
@@ -120,10 +127,10 @@ def test_read_readme():
         # Create a sample README
         readme = Path(tmpdir) / "README.md"
         readme.write_text("# Test Module\n\nThis is a test module.")
-        
+
         parser = TerraformParser(tmpdir)
         content = parser._read_readme()
-        
+
         assert content is not None
         assert "Test Module" in content
 
@@ -134,10 +141,10 @@ def test_extract_description():
         # Create a sample README
         readme = Path(tmpdir) / "README.md"
         readme.write_text("# Test Module\n\nThis module creates AWS VPC resources.")
-        
+
         parser = TerraformParser(tmpdir)
         description = parser._extract_description()
-        
+
         assert description is not None
         assert "VPC" in description
 
@@ -146,7 +153,8 @@ def test_parse_module_complete():
     """Test complete module parsing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create sample terraform files
-        (Path(tmpdir) / "main.tf").write_text("""
+        (Path(tmpdir) / "main.tf").write_text(
+            """
 terraform {
   required_providers {
     aws = {
@@ -155,25 +163,30 @@ terraform {
     }
   }
 }
-""")
-        
-        (Path(tmpdir) / "variables.tf").write_text("""
+"""
+        )
+
+        (Path(tmpdir) / "variables.tf").write_text(
+            """
 variable "name" {
   description = "Name of the resource"
   type        = string
 }
-""")
-        
-        (Path(tmpdir) / "outputs.tf").write_text("""
+"""
+        )
+
+        (Path(tmpdir) / "outputs.tf").write_text(
+            """
 output "id" {
   description = "Resource ID"
   value       = aws_resource.main.id
 }
-""")
-        
+"""
+        )
+
         parser = TerraformParser(tmpdir)
         summary = parser.parse_module("https://github.com/test/repo", "main")
-        
+
         assert summary.repository == "https://github.com/test/repo"
         assert summary.ref == "main"
         assert len(summary.variables) == 1

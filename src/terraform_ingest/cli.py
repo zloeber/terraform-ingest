@@ -10,18 +10,20 @@ from pathlib import Path
 from terraform_ingest.models import RepositoryConfig
 from terraform_ingest.ingest import TerraformIngest
 from terraform_ingest.models import IngestConfig
-from terraform_ingest import __version__, SCRIPT_PATH, CONFIG_PATH
+from terraform_ingest import __version__, CONFIG_PATH
 from terraform_ingest.mcp_service import main as mcp_main
+
 
 @click.group()
 @click.version_option(version=__version__)
 def cli():
     """Terraform Ingest - A terraform multi-repo module AI RAG ingestion engine.
-    
+
     This tool accepts a YAML file of terraform git repository sources,
     downloads them locally, and creates JSON summaries for RAG ingestion.
     """
     pass
+
 
 @cli.command()
 @click.argument("config_file", type=click.Path(exists=True), default=CONFIG_PATH)
@@ -49,25 +51,24 @@ def cli():
 )
 def ingest(config_file, output_dir, clone_dir, cleanup, no_cache):
     """Ingest terraform repositories from a YAML configuration file.
-    
+
     CONFIG_FILE: Path to the YAML configuration file containing repository sources.
-    
+
     Example:
-    
+
         terraform-ingest ingest config.yaml
-    
+
         terraform-ingest ingest config.yaml -o ./my-output -c ./my-repos
     """
     click.echo(f"Loading configuration from {config_file}")
 
     try:
         ingester = TerraformIngest.from_yaml(config_file)
-        
+
         # Override config if command-line options are provided
         if output_dir is not None:
             ingester.config.output_dir = output_dir
             ingester.output_dir = Path(output_dir)
-
 
         if clone_dir is not None:
             ingester.config.clone_dir = clone_dir
@@ -83,7 +84,7 @@ def ingest(config_file, output_dir, clone_dir, cleanup, no_cache):
         click.echo("Starting ingestion...")
         summaries = ingester.ingest()
 
-        click.echo(f"\nIngestion complete!")
+        click.echo("\nIngestion complete!")
         click.echo(f"Processed {len(summaries)} module(s)")
         click.echo(f"Summaries saved to {ingester.output_dir}")
 
@@ -131,15 +132,23 @@ def ingest(config_file, output_dir, clone_dir, cleanup, no_cache):
     default=False,
     help="Ignore the default branch when processing",
 )
-def analyze(repository_url, branch, output, include_tags, max_tags, recursive, ignore_default_branch):
+def analyze(
+    repository_url,
+    branch,
+    output,
+    include_tags,
+    max_tags,
+    recursive,
+    ignore_default_branch,
+):
     """Analyze a single terraform repository.
-    
+
     REPOSITORY_URL: Git URL of the repository to analyze.
-    
+
     Example:
-    
+
         terraform-ingest analyze https://github.com/user/terraform-module
-    
+
         terraform-ingest analyze https://github.com/user/terraform-module -b develop --include-tags
     """
     click.echo(f"Analyzing repository: {repository_url}")
@@ -154,7 +163,7 @@ def analyze(repository_url, branch, output, include_tags, max_tags, recursive, i
             recursive=recursive,
             ignore_default_branch=ignore_default_branch,
         )
-        
+
         config = IngestConfig(
             repositories=[repo_config],
             output_dir="./output",
@@ -184,15 +193,15 @@ def analyze(repository_url, branch, output, include_tags, max_tags, recursive, i
 @click.argument("config_file", type=click.Path())
 def init(config_file):
     """Initialize a sample configuration file.
-    
+
     CONFIG_FILE: Path where the configuration file should be created.
-    
+
     Example:
-    
+
         terraform-ingest init config.yaml
     """
     config_path = Path(config_file)
-    
+
     if config_path.exists():
         click.echo(f"Error: {config_file} already exists", err=True)
         raise click.Abort()
@@ -235,19 +244,19 @@ def init(config_file):
 )
 def serve(host, port):
     """Start the FastAPI server.
-    
+
     Example:
-    
+
         terraform-ingest serve
-        
+
         terraform-ingest serve --host 127.0.0.1 --port 8080
     """
     import uvicorn
     from .api import app
-    
+
     click.echo(f"Starting Terraform Ingest API server on {host}:{port}")
     click.echo("Press CTRL+C to quit")
-    
+
     uvicorn.run(app, host=host, port=port)
 
 
@@ -266,14 +275,14 @@ def serve(host, port):
 )
 def mcp(config, show):
     """Start the MCP (Model Context Protocol) server.
-    
+
     The MCP server exposes ingested Terraform modules to AI agents and supports
     auto-ingestion based on configuration settings.
-    
+
     Example:
-    
+
         terraform-ingest mcp
-        
+
         terraform-ingest mcp --config my-config.yaml
     """
     # Set the config file environment variable if provided
@@ -287,7 +296,7 @@ def mcp(config, show):
         return
     click.echo(f"Starting MCP server with config: {config}")
     click.echo("Press CTRL+C to quit")
-    
+
     try:
         mcp_main()
     except KeyboardInterrupt:

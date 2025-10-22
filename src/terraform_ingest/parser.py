@@ -1,9 +1,7 @@
 """Terraform file parser for extracting module information."""
 
-import os
-import json
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 import hcl2
 from .models import (
     TerraformVariable,
@@ -21,7 +19,9 @@ class TerraformParser:
         """Initialize the parser with a module path."""
         self.module_path = Path(module_path)
 
-    def parse_module(self, repo_url: str, ref: str, relative_path: Optional[str] = None) -> TerraformModuleSummary:
+    def parse_module(
+        self, repo_url: str, ref: str, relative_path: Optional[str] = None
+    ) -> TerraformModuleSummary:
         """Parse a Terraform module and return a summary."""
         variables = self._parse_variables()
         outputs = self._parse_outputs()
@@ -73,7 +73,9 @@ class TerraformParser:
 
                                 description = var_config.get("description")
                                 if description and isinstance(description, list):
-                                    description = description[0] if len(description) > 0 else None
+                                    description = (
+                                        description[0] if len(description) > 0 else None
+                                    )
 
                                 variables.append(
                                     TerraformVariable(
@@ -107,7 +109,9 @@ class TerraformParser:
                             for output_name, output_config in output_list.items():
                                 description = output_config.get("description")
                                 if description and isinstance(description, list):
-                                    description = description[0] if len(description) > 0 else None
+                                    description = (
+                                        description[0] if len(description) > 0 else None
+                                    )
 
                                 value = output_config.get("value")
                                 if value:
@@ -115,7 +119,9 @@ class TerraformParser:
 
                                 sensitive = output_config.get("sensitive", False)
                                 if isinstance(sensitive, list):
-                                    sensitive = sensitive[0] if len(sensitive) > 0 else False
+                                    sensitive = (
+                                        sensitive[0] if len(sensitive) > 0 else False
+                                    )
 
                                 outputs.append(
                                     TerraformOutput(
@@ -147,9 +153,14 @@ class TerraformParser:
                             if "required_providers" in terraform_block:
                                 req_providers = terraform_block["required_providers"]
                                 if isinstance(req_providers, list):
-                                    req_providers = req_providers[0] if req_providers else {}
+                                    req_providers = (
+                                        req_providers[0] if req_providers else {}
+                                    )
 
-                                for provider_name, provider_config in req_providers.items():
+                                for (
+                                    provider_name,
+                                    provider_config,
+                                ) in req_providers.items():
                                     source = None
                                     version = None
 

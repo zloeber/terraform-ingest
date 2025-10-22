@@ -31,9 +31,9 @@ print("=" * 50)
 
 try:
     ingester = TerraformIngest.from_yaml("config.yaml")
-    print(f"Loaded configuration from config.yaml")
+    print("Loaded configuration from config.yaml")
     print(f"Will process {len(ingester.config.repositories)} repository/repositories")
-    
+
     # Run ingestion
     # summaries = ingester.ingest()
     # print(f"Processed {len(summaries)} module version(s)")
@@ -46,7 +46,7 @@ print("=" * 50)
 
 # This would actually clone and process the repository
 # summaries = ingester.ingest()
-# 
+#
 # for summary in summaries:
 #     print(f"\nRepository: {summary.repository}")
 #     print(f"Ref: {summary.ref}")

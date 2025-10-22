@@ -50,7 +50,7 @@ class TerraformIngest:
             repo_name = repo_name[:-4]
 
         ref_name = summary.ref.replace("/", "_")
-        
+
         # Include module path in filename if it's not the root
         if summary.path and summary.path != "." and summary.path != "/":
             # Clean up the path for filename use
@@ -69,9 +69,7 @@ class TerraformIngest:
     def get_all_summaries_json(self) -> str:
         """Get all summaries as a single JSON string."""
         summaries = self.ingest()
-        return json.dumps(
-            [s.model_dump() for s in summaries], indent=2, default=str
-        )
+        return json.dumps([s.model_dump() for s in summaries], indent=2, default=str)
 
     def cleanup(self):
         """Clean up temporary files."""

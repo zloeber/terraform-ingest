@@ -1,6 +1,5 @@
 """Tests for data models."""
 
-import pytest
 from terraform_ingest.models import (
     TerraformVariable,
     TerraformOutput,
