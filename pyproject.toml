@@ -1,7 +1,7 @@
 [project]
 name = "terraform-ingest"
 dynamic = ["version"]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "click>=8.3.0",
     "fastapi>=0.119.0",
