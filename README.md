@@ -436,6 +436,70 @@ if ingester.vector_db:
         print(f"Found: {result['metadata']['repository']}")
 ```
 
+## Vector Database Embeddings
+
+Terraform-ingest supports semantic search through vector database embeddings with ChromaDB. This enables natural language queries and AI-powered module discovery.
+
+### Quick Start
+
+1. **Install ChromaDB**:
+   ```bash
+   pip install chromadb
+   ```
+
+2. **Enable in config**:
+   ```yaml
+   embedding:
+     enabled: true
+     strategy: chromadb-default
+     chromadb_path: ./chromadb
+     collection_name: terraform_modules
+   ```
+
+3. **Ingest and search**:
+   ```bash
+   terraform-ingest ingest config.yaml
+   terraform-ingest search "vpc module for aws"
+   ```
+
+### Features
+
+- 🎯 **Semantic Search**: Natural language queries like "vpc with private subnets"
+- 🔌 **Multiple Strategies**: ChromaDB default, OpenAI, Claude, or sentence-transformers
+- 🏷️ **Metadata Filtering**: Filter by provider, repository, tags
+- 🔄 **Incremental Updates**: Automatically update embeddings on re-ingestion
+- 🎛️ **Hybrid Search**: Combine vector similarity with keyword matching
+
+### Embedding Strategies
+
+| Strategy | Description | Setup |
+|----------|-------------|-------|
+| `chromadb-default` | Built-in ChromaDB embeddings | `pip install chromadb` |
+| `sentence-transformers` | Local models, no API | `pip install sentence-transformers` |
+| `openai` | Best quality, requires API key | `pip install openai` |
+| `claude` | Voyage AI embeddings | `pip install voyageai` |
+
+### Documentation
+
+- **[Quick Start Guide](docs/QUICKSTART_EMBEDDINGS.md)** - Get started in 5 minutes
+- **[Complete Documentation](docs/vector_database_embeddings_FEATURE.md)** - Full configuration and usage guide
+- **[Example Config](examples/config-with-embeddings.yaml)** - Working configuration example
+
+### Example Queries
+
+```bash
+# Natural language
+terraform-ingest search "module for creating kubernetes clusters with autoscaling"
+
+# With filters
+terraform-ingest search "database with replication" --provider aws --limit 3
+
+# Via API
+curl -X POST http://localhost:8000/search/vector \
+  -H "Content-Type: application/json" \
+  -d '{"query": "vpc with vpn support", "provider": "aws"}'
+```
+
 ## Development
 
 ### Running Tests
