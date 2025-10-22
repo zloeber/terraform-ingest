@@ -44,6 +44,7 @@ A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file o
 - 🤖 **MCP Integration**: FastMCP service for AI agent access to ingested modules
 - 📊 **JSON Output**: Generates structured JSON summaries ready for RAG ingestion
 - 🔐 **Credential Support**: Uses existing git credentials for private repositories
+- 🧠 **Vector Database Embeddings**: Semantic search with ChromaDB, OpenAI, Claude, or sentence-transformers
 
 ## Installation
 
@@ -51,6 +52,20 @@ A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file o
 uv sync
 source .venv/bin/activate
 ```
+
+### Optional: Install with Vector Database Support
+
+For semantic search with ChromaDB embeddings:
+
+```bash
+# Using pip
+pip install chromadb sentence-transformers
+
+# Or for all embedding options (OpenAI, Claude/Voyage)
+pip install chromadb sentence-transformers openai voyageai
+```
+
+See [Vector Database Embeddings](docs/vector_database_embeddings_FEATURE.md) for detailed setup instructions.
 
 ## Usage
 
@@ -97,6 +112,23 @@ Save output to file:
 ```bash
 terraform-ingest analyze https://github.com/user/terraform-module -o output.json
 ```
+
+#### Search with Vector Database
+
+Search for modules using semantic search (requires embeddings to be enabled):
+
+```bash
+# Basic semantic search
+terraform-ingest search "vpc module for aws"
+
+# Filter by provider
+terraform-ingest search "kubernetes cluster" --provider aws
+
+# Filter by repository and limit results
+terraform-ingest search "security group" --repository https://github.com/terraform-aws-modules/terraform-aws-vpc --limit 5
+```
+
+See [Vector Database Embeddings](docs/vector_database_embeddings_FEATURE.md) for configuration and advanced usage.
 
 ### MCP Service for AI Agents
 
@@ -149,6 +181,20 @@ Returns detailed module information including:
 - Providers and sub-modules
 - README content
 
+**search_modules_vector** *(New)*
+```python
+# Semantic search with vector embeddings
+search_modules_vector(
+    query="module for creating VPCs in AWS",  # Natural language query
+    provider="aws",                           # Optional: filter by provider
+    repository="https://...",                 # Optional: filter by repo
+    limit=10,                                 # Optional: max results
+    config_file="config.yaml"                 # Config with embedding settings
+)
+```
+
+Returns semantically similar modules with relevance scores. Requires vector database to be enabled in configuration.
+
 #### Example MCP Usage
 
 Once the MCP server is running, AI agents can use it to:
@@ -198,6 +244,7 @@ python -m terraform_ingest.api
 - `POST /ingest` - Ingest multiple repositories
 - `POST /analyze` - Analyze a single repository
 - `POST /ingest-from-yaml` - Ingest from YAML configuration string
+- `POST /search/vector` - Search modules using vector embeddings *(New)*
 
 #### Example API Requests
 
@@ -231,6 +278,19 @@ curl -X POST http://localhost:8000/ingest \
   }'
 ```
 
+**Search with vector embeddings:** *(New)*
+
+```bash
+curl -X POST http://localhost:8000/search/vector \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "vpc module with public and private subnets",
+    "provider": "aws",
+    "limit": 5,
+    "config_file": "config.yaml"
+  }'
+```
+
 ## Configuration File Format
 
 The YAML configuration file defines repositories to process:
@@ -255,6 +315,13 @@ repositories:
 
 output_dir: ./output
 clone_dir: ./repos
+
+# Optional: Vector database configuration for semantic search
+embedding:
+  enabled: true
+  strategy: chromadb-default  # or: openai, claude, sentence-transformers
+  chromadb_path: ./chromadb
+  collection_name: terraform_modules
 ```
 
 ### Configuration Options
@@ -270,6 +337,14 @@ clone_dir: ./repos
 **Global Options:**
 - `output_dir` (optional): Directory for JSON output files (default: "./output")
 - `clone_dir` (optional): Directory for cloning repositories (default: "./repos")
+
+**Embedding Options** *(New)*:
+- `embedding.enabled` (optional): Enable vector database embeddings (default: false)
+- `embedding.strategy` (optional): Embedding strategy - "chromadb-default", "openai", "claude", or "sentence-transformers" (default: "chromadb-default")
+- `embedding.chromadb_path` (optional): Path to ChromaDB storage (default: "./chromadb")
+- `embedding.collection_name` (optional): ChromaDB collection name (default: "terraform_modules")
+
+See [Vector Database Embeddings](docs/vector_database_embeddings_FEATURE.md) for complete embedding configuration options.
 
 ## Output Format
 
@@ -336,7 +411,8 @@ from terraform_ingest import TerraformIngest
 ingester = TerraformIngest.from_yaml('config.yaml')
 summaries = ingester.ingest()
 
-# Process for vector database
+# Process for vector database (automatic if embeddings enabled in config)
+# Or manually process JSON summaries for your own vector database
 for summary in summaries:
     # Create embeddings from description, variables, outputs
     text = f"{summary.description} Inputs: {summary.variables} Outputs: {summary.outputs}"
@@ -348,6 +424,16 @@ for summary in summaries:
         "providers": [p.name for p in summary.providers]
     }
     # vector_db.store(text, metadata)
+
+# With built-in embeddings enabled, search semantically
+if ingester.vector_db:
+    results = ingester.search_vector_db(
+        "vpc module with private subnets",
+        filters={"provider": "aws"},
+        n_results=5
+    )
+    for result in results:
+        print(f"Found: {result['metadata']['repository']}")
 ```
 
 ## Development
