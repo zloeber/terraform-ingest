@@ -2,10 +2,11 @@
 
 import json
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 import yaml
 from .models import IngestConfig, TerraformModuleSummary
 from .repository import RepositoryManager
+from .embeddings import VectorDBManager
 
 
 class TerraformIngest:
@@ -17,6 +18,11 @@ class TerraformIngest:
         self.repo_manager = RepositoryManager(config.clone_dir)
         self.output_dir = Path(config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize vector database manager if enabled
+        self.vector_db = None
+        if config.embedding and config.embedding.enabled:
+            self.vector_db = VectorDBManager(config.embedding)
 
     @classmethod
     def from_yaml(cls, yaml_path: str) -> "TerraformIngest":
@@ -65,6 +71,14 @@ class TerraformIngest:
             json.dump(summary.model_dump(), f, indent=2, default=str)
 
         print(f"Saved summary to {output_path}")
+        
+        # Upsert to vector database if enabled
+        if self.vector_db:
+            try:
+                doc_id = self.vector_db.upsert_module(summary)
+                print(f"Upserted to vector database with ID: {doc_id}")
+            except Exception as e:
+                print(f"Warning: Failed to upsert to vector database: {e}")
 
     def get_all_summaries_json(self) -> str:
         """Get all summaries as a single JSON string."""
@@ -74,3 +88,24 @@ class TerraformIngest:
     def cleanup(self):
         """Clean up temporary files."""
         self.repo_manager.cleanup()
+    
+    def get_vector_db_stats(self):
+        """Get vector database statistics."""
+        if self.vector_db:
+            return self.vector_db.get_collection_stats()
+        return {"enabled": False}
+    
+    def search_vector_db(self, query: str, filters: Optional[dict] = None, n_results: int = 10):
+        """Search the vector database.
+        
+        Args:
+            query: Search query
+            filters: Optional metadata filters
+            n_results: Number of results to return
+            
+        Returns:
+            List of matching modules
+        """
+        if self.vector_db:
+            return self.vector_db.search_modules(query, filters, n_results)
+        return []

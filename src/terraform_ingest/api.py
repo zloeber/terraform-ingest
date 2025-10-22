@@ -47,6 +47,24 @@ class AnalyzeRequest(BaseModel):
     path: str = "."
 
 
+class VectorSearchRequest(BaseModel):
+    """Request model for vector search."""
+    
+    query: str
+    provider: Optional[str] = None
+    repository: Optional[str] = None
+    limit: int = 10
+    config_file: str = "config.yaml"
+
+
+class VectorSearchResponse(BaseModel):
+    """Response model for vector search."""
+    
+    results: List[dict]
+    count: int
+    query: str
+
+
 @app.get("/")
 async def root():
     """Root endpoint with API information."""
@@ -57,6 +75,7 @@ async def root():
         "endpoints": {
             "POST /ingest": "Ingest multiple repositories from configuration",
             "POST /analyze": "Analyze a single repository",
+            "POST /search/vector": "Search modules using vector embeddings",
             "GET /health": "Health check endpoint",
         },
     }
@@ -185,6 +204,55 @@ async def ingest_from_yaml(yaml_content: str):
 
     except yaml.YAMLError as e:
         raise HTTPException(status_code=400, detail=f"Invalid YAML: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/search/vector", response_model=VectorSearchResponse)
+async def search_vector(request: VectorSearchRequest):
+    """Search for Terraform modules using vector embeddings.
+    
+    This endpoint uses semantic search to find modules based on natural
+    language queries. Vector database must be enabled in the configuration.
+    
+    Args:
+        request: VectorSearchRequest with query and filters
+        
+    Returns:
+        VectorSearchResponse with matching modules and relevance scores
+    """
+    try:
+        # Load config to get vector DB settings
+        ingester = TerraformIngest.from_yaml(request.config_file)
+        
+        if not ingester.vector_db:
+            raise HTTPException(
+                status_code=400,
+                detail="Vector database is not enabled. Set 'embedding.enabled: true' in config."
+            )
+        
+        # Prepare filters
+        filters = {}
+        if request.provider:
+            filters["provider"] = request.provider
+        if request.repository:
+            filters["repository"] = request.repository
+        
+        # Search
+        results = ingester.search_vector_db(
+            request.query,
+            filters=filters if filters else None,
+            n_results=request.limit
+        )
+        
+        return VectorSearchResponse(
+            results=results,
+            count=len(results),
+            query=request.query
+        )
+        
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

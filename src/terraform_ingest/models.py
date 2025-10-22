@@ -1,6 +1,6 @@
 """Data models for terraform-ingest."""
 
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Literal
 from pydantic import BaseModel, Field
 
 
@@ -74,6 +74,40 @@ class McpConfig(BaseModel):
     config_file: str = "config.yaml"
 
 
+class EmbeddingConfig(BaseModel):
+    """Configuration for vector database embeddings."""
+
+    enabled: bool = False
+    strategy: Literal["openai", "claude", "sentence-transformers", "chromadb-default"] = "chromadb-default"
+    
+    # API keys for cloud embeddings
+    openai_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    
+    # Model selection
+    openai_model: str = "text-embedding-3-small"
+    anthropic_model: str = "claude-3-haiku-20240307"
+    sentence_transformers_model: str = "all-MiniLM-L6-v2"
+    
+    # ChromaDB configuration
+    chromadb_host: Optional[str] = None  # For client/server mode
+    chromadb_port: int = 8000
+    chromadb_path: str = "./chromadb"  # For persistent mode
+    collection_name: str = "terraform_modules"
+    
+    # Embedding content configuration
+    include_description: bool = True
+    include_readme: bool = True
+    include_variables: bool = True
+    include_outputs: bool = True
+    include_resource_types: bool = True
+    
+    # Hybrid search configuration
+    enable_hybrid_search: bool = True
+    keyword_weight: float = 0.3  # Weight for keyword search (0.0 to 1.0)
+    vector_weight: float = 0.7   # Weight for vector search (0.0 to 1.0)
+
+
 class IngestConfig(BaseModel):
     """Configuration for the ingestion process."""
 
@@ -81,3 +115,4 @@ class IngestConfig(BaseModel):
     output_dir: str = "./output"
     clone_dir: str = "./repos"
     mcp: Optional[McpConfig] = None
+    embedding: Optional[EmbeddingConfig] = None
