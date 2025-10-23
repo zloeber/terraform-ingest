@@ -5,6 +5,7 @@ from terraform_ingest.models import (
     TerraformOutput,
     TerraformProvider,
     TerraformModule,
+    TerraformResource,
     TerraformModuleSummary,
     RepositoryConfig,
     IngestConfig,
@@ -59,6 +60,18 @@ def test_terraform_module():
     assert module.source == "terraform-aws-modules/vpc/aws"
 
 
+def test_terraform_resource():
+    """Test TerraformResource model."""
+    resource = TerraformResource(
+        type="aws_vpc",
+        name="main",
+        description="Main VPC",
+    )
+    assert resource.type == "aws_vpc"
+    assert resource.name == "main"
+    assert resource.description == "Main VPC"
+
+
 def test_terraform_module_summary():
     """Test TerraformModuleSummary model."""
     summary = TerraformModuleSummary(
@@ -71,6 +84,17 @@ def test_terraform_module_summary():
     assert summary.ref == "main"
     assert len(summary.variables) == 0
     assert len(summary.outputs) == 0
+    assert len(summary.resources) == 0
+
+    # Test with resources
+    resource = TerraformResource(type="aws_vpc", name="main")
+    summary_with_resources = TerraformModuleSummary(
+        repository="https://github.com/user/terraform-module",
+        ref="main",
+        resources=[resource],
+    )
+    assert len(summary_with_resources.resources) == 1
+    assert summary_with_resources.resources[0].type == "aws_vpc"
 
 
 def test_repository_config():

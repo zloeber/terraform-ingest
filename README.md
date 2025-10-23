@@ -2,9 +2,12 @@
 
 A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file of terraform git repository sources, downloads them locally using existing credentials, creates JSON summaries of their purpose, inputs, outputs, and providers for branches or tagged releases you specify for ingestion via a RAG pipeline into a vector database. Includes an easy to use cli, API, or MCP server.
 
+## Table Of Contents
+
 <!---toc start-->
 
 * [terraform-ingest](#terraform-ingest)
+  * [Table Of Contents](#table-of-contents)
   * [Features](#features)
   * [Installation](#installation)
     * [Optional: Install with Vector Database Support](#optional-install-with-vector-database-support)
@@ -56,9 +59,21 @@ A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file o
 
 ## Installation
 
+This application can be run locally as a CLI, API service, or MCP server using uv or docker.
+
 ```bash
-uv sync
-source .venv/bin/activate
+# simple pip install
+pip install terraform-ingest
+
+## Or only with uv
+# Create a config
+uv run terraform-ingest init config.yaml
+
+# Update your config.yaml file to include your terraform module information and mcp config then preform the initial ingestion
+uv run terraform-ingest ingest
+
+# Run a quick cli search to test things out
+uv run terraform-ingest search "vpc module for aws"
 ```
 
 ### Optional: Install with Vector Database Support

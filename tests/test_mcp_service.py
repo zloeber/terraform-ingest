@@ -42,6 +42,11 @@ def sample_output_dir():
                     {"name": "aws", "source": "hashicorp/aws", "version": ">= 4.0"}
                 ],
                 "modules": [],
+                "resources": [
+                    {"type": "aws_vpc", "name": "main", "description": None},
+                    {"type": "aws_subnet", "name": "public", "description": None},
+                    {"type": "aws_subnet", "name": "private", "description": None},
+                ],
                 "readme_content": "# AWS VPC Terraform module\nThis module creates VPC resources",
             },
             {
@@ -70,6 +75,11 @@ def sample_output_dir():
                     {"name": "aws", "source": "hashicorp/aws", "version": ">= 4.0"}
                 ],
                 "modules": [],
+                "resources": [
+                    {"type": "aws_vpc", "name": "main", "description": None},
+                    {"type": "aws_subnet", "name": "public", "description": None},
+                    {"type": "aws_subnet", "name": "private", "description": None},
+                ],
                 "readme_content": "# AWS VPC Terraform module\nThis module creates VPC resources",
             },
             {
@@ -102,13 +112,17 @@ def sample_output_dir():
                     }
                 ],
                 "modules": [],
+                "resources": [
+                    {"type": "azurerm_virtual_network", "name": "main", "description": None},
+                    {"type": "azurerm_subnet", "name": "main", "description": None},
+                ],
                 "readme_content": "# Azure Network Terraform module\nThis module creates Azure network resources",
             },
         ]
 
         # Write summaries to files
         for i, summary in enumerate(summaries):
-            filename = output_dir / f"module_{i}.json"
+            filename = Path.joinpath(output_dir, f"module_{i}.json")
             with open(filename, "w", encoding="utf-8") as f:
                 json.dump(summary, f, indent=2)
 
@@ -307,40 +321,6 @@ def test_mcp_search_modules_tool(sample_output_dir):
     assert len(combined_results) == 2
 
 
-def test_mcp_tools_with_empty_directory():
-    """Test MCP tools with empty output directory."""
-    from terraform_ingest.mcp_service import (
-        _list_repositories_impl,
-        _search_modules_impl,
-    )
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Test list_repositories with empty directory
-        repos = _list_repositories_impl(output_dir=tmpdir)
-        assert len(repos) == 0
-
-        # Test search_modules with empty directory
-        results = _search_modules_impl(query="test", output_dir=tmpdir)
-        assert len(results) == 0
-
-
-def test_mcp_tools_with_nonexistent_directory():
-    """Test MCP tools with nonexistent output directory."""
-    from terraform_ingest.mcp_service import (
-        _list_repositories_impl,
-        _search_modules_impl,
-    )
-
-    nonexistent_dir = "/nonexistent/directory"
-
-    # Should handle gracefully and return empty results
-    repos = _list_repositories_impl(output_dir=nonexistent_dir)
-    assert len(repos) == 0
-
-    results = _search_modules_impl(query="test", output_dir=nonexistent_dir)
-    assert len(results) == 0
-
-
 def test_mcp_search_modules_edge_cases(sample_output_dir):
     """Test search_modules with edge cases."""
     from terraform_ingest.mcp_service import _search_modules_impl
@@ -381,6 +361,212 @@ def test_mcp_list_repositories_edge_cases(sample_output_dir):
     # Zero limit
     zero_repos = _list_repositories_impl(limit=0, output_dir=sample_output_dir)
     assert len(zero_repos) == 0
+
+
+def test_get_module_details_by_exact_match(sample_output_dir):
+    """Test retrieving module details by exact repository, ref, and path match."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # Get AWS VPC main branch module details
+    module = service.get_module(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="main",
+        path=".",
+    )
+
+    assert module is not None
+    assert (
+        module["repository"]
+        == "https://github.com/terraform-aws-modules/terraform-aws-vpc"
+    )
+    assert module["ref"] == "main"
+    assert module["path"] == "."
+    assert (
+        module["description"] == "Terraform module which creates VPC resources on AWS"
+    )
+    assert len(module["variables"]) == 1
+    assert module["variables"][0]["name"] == "vpc_cidr"
+    assert len(module["outputs"]) == 1
+    assert module["outputs"][0]["name"] == "vpc_id"
+    assert len(module["providers"]) == 1
+    assert module["providers"][0]["name"] == "aws"
+
+
+def test_get_module_details_by_version_tag(sample_output_dir):
+    """Test retrieving module details for a specific version tag."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # Get AWS VPC tagged version
+    module = service.get_module(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="v5.0.0",
+        path=".",
+    )
+
+    assert module is not None
+    assert module["ref"] == "v5.0.0"
+    assert (
+        module["description"] == "Terraform module which creates VPC resources on AWS"
+    )
+
+
+def test_get_module_details_not_found(sample_output_dir):
+    """Test retrieving module details for nonexistent module."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # Try to get a module that doesn't exist
+    module = service.get_module(
+        repository="https://github.com/nonexistent/repo",
+        ref="main",
+        path=".",
+    )
+
+    assert module is None
+
+
+def test_get_module_details_wrong_ref(sample_output_dir):
+    """Test retrieving module details with wrong ref."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # Try to get a module with wrong ref
+    module = service.get_module(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="nonexistent-ref",
+        path=".",
+    )
+
+    assert module is None
+
+
+def test_get_module_details_wrong_path(sample_output_dir):
+    """Test retrieving module details with wrong path."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # Try to get a module with wrong path
+    module = service.get_module(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="main",
+        path="nonexistent/path",
+    )
+
+    assert module is None
+
+
+def test_mcp_get_module_details_tool(sample_output_dir):
+    """Test the MCP get_module_details tool function."""
+    from terraform_ingest.mcp_service import _get_module_details_impl
+
+    # Test retrieving a module successfully
+    module = _get_module_details_impl(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="main",
+        path=".",
+        output_dir=sample_output_dir,
+    )
+
+    assert module is not None
+    assert (
+        module["repository"]
+        == "https://github.com/terraform-aws-modules/terraform-aws-vpc"
+    )
+    assert module["ref"] == "main"
+
+    # Verify complete structure
+    assert "path" in module
+    assert "description" in module
+    assert "variables" in module
+    assert "outputs" in module
+    assert "providers" in module
+    assert "modules" in module
+    assert "readme_content" in module
+
+
+def test_mcp_get_module_details_tool_not_found(sample_output_dir):
+    """Test the MCP get_module_details tool with nonexistent module."""
+    from terraform_ingest.mcp_service import _get_module_details_impl
+
+    # Test retrieving a module that doesn't exist
+    module = _get_module_details_impl(
+        repository="https://github.com/nonexistent/repo",
+        ref="main",
+        path=".",
+        output_dir=sample_output_dir,
+    )
+
+    assert module is None
+
+
+def test_mcp_get_module_details_tool_azure(sample_output_dir):
+    """Test the MCP get_module_details tool with Azure module."""
+    from terraform_ingest.mcp_service import _get_module_details_impl
+
+    # Test retrieving Azure network module
+    module = _get_module_details_impl(
+        repository="https://github.com/terraform-azure-modules/terraform-azurerm-network",
+        ref="main",
+        path=".",
+        output_dir=sample_output_dir,
+    )
+
+    assert module is not None
+    assert (
+        module["repository"]
+        == "https://github.com/terraform-azure-modules/terraform-azurerm-network"
+    )
+    assert module["ref"] == "main"
+    assert "azurerm" in str(module["providers"]).lower()
+    assert "address_space" in str(module["variables"])
+
+
+def test_mcp_tools_with_empty_directory():
+    """Test MCP tools with empty output directory."""
+    from terraform_ingest.mcp_service import (
+        _list_repositories_impl,
+        _search_modules_impl,
+        _get_module_details_impl,
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Test list_repositories with empty directory
+        repos = _list_repositories_impl(output_dir=tmpdir)
+        assert len(repos) == 0
+
+        # Test search_modules with empty directory
+        results = _search_modules_impl(query="test", output_dir=tmpdir)
+        assert len(results) == 0
+
+        # Test get_module_details with empty directory
+        module = _get_module_details_impl(
+            repository="https://github.com/example/repo",
+            ref="main",
+            output_dir=tmpdir,
+        )
+        assert module is None
+
+
+def test_mcp_tools_with_nonexistent_directory():
+    """Test MCP tools with nonexistent output directory."""
+    from terraform_ingest.mcp_service import (
+        _list_repositories_impl,
+        _search_modules_impl,
+        _get_module_details_impl,
+    )
+
+    nonexistent_dir = "/nonexistent/directory"
+
+    # Should handle gracefully and return empty/None results
+    repos = _list_repositories_impl(output_dir=nonexistent_dir)
+    assert len(repos) == 0
+
+    results = _search_modules_impl(query="test", output_dir=nonexistent_dir)
+    assert len(results) == 0
+
+    module = _get_module_details_impl(
+        repository="https://github.com/example/repo",
+        ref="main",
+        output_dir=nonexistent_dir,
+    )
+    assert module is None
 
 
 # MCP Auto-Ingestion Tests
@@ -491,3 +677,196 @@ def test_get_service_singleton():
 
     # Reset for other tests
     mcp_module._service = None
+
+
+def test_list_modules(sample_output_dir):
+    """Test listing all modules."""
+    service = ModuleQueryService(sample_output_dir)
+    modules = service.list_modules()
+
+    assert len(modules) == 3
+    assert all("repository" in m for m in modules)
+    assert all("ref" in m for m in modules)
+    assert all("resource_count" in m for m in modules)
+    assert all("variable_count" in m for m in modules)
+    assert all("output_count" in m for m in modules)
+
+    # Check AWS VPC modules have resources
+    aws_modules = [m for m in modules if "terraform-aws-vpc" in m["repository"]]
+    assert all(m["resource_count"] == 3 for m in aws_modules)
+
+
+def test_list_modules_with_limit(sample_output_dir):
+    """Test listing modules with limit."""
+    service = ModuleQueryService(sample_output_dir)
+    modules = service.list_modules(limit=2)
+
+    assert len(modules) == 2
+
+
+def test_list_module_resources_aws_vpc(sample_output_dir):
+    """Test listing resources for AWS VPC module."""
+    service = ModuleQueryService(sample_output_dir)
+    resources = service.list_module_resources(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="main",
+        path=".",
+    )
+
+    assert len(resources) == 3
+    assert any(r["type"] == "aws_vpc" for r in resources)
+    assert any(r["type"] == "aws_subnet" for r in resources)
+    assert any(r["name"] == "public" for r in resources)
+
+
+def test_list_module_resources_azure(sample_output_dir):
+    """Test listing resources for Azure module."""
+    service = ModuleQueryService(sample_output_dir)
+    resources = service.list_module_resources(
+        repository="https://github.com/terraform-azure-modules/terraform-azurerm-network",
+        ref="main",
+        path=".",
+    )
+
+    assert len(resources) == 2
+    assert any(r["type"] == "azurerm_virtual_network" for r in resources)
+    assert any(r["type"] == "azurerm_subnet" for r in resources)
+
+
+def test_list_module_resources_not_found(sample_output_dir):
+    """Test listing resources for non-existent module."""
+    service = ModuleQueryService(sample_output_dir)
+    resources = service.list_module_resources(
+        repository="https://github.com/nonexistent/repo", ref="main"
+    )
+
+    assert resources == []
+
+
+def test_mcp_list_modules_tool(sample_output_dir):
+    """Test the MCP list_modules tool."""
+    from terraform_ingest.mcp_service import _list_modules_impl
+
+    modules = _list_modules_impl(output_dir=sample_output_dir)
+
+    assert len(modules) == 3
+    assert all("repository" in m for m in modules)
+    assert all("resource_count" in m for m in modules)
+
+
+def test_mcp_list_module_resources_tool(sample_output_dir):
+    """Test the MCP list_module_resources tool."""
+    from terraform_ingest.mcp_service import _list_module_resources_impl
+
+    resources = _list_module_resources_impl(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="main",
+        path=".",
+        output_dir=sample_output_dir,
+    )
+
+    assert len(resources) == 3
+    assert any(r["type"] == "aws_vpc" for r in resources)
+
+
+def test_generate_module_uri(sample_output_dir):
+    """Test generating module URIs."""
+    service = ModuleQueryService(sample_output_dir)
+    uri = service._generate_module_uri(
+        "https://github.com/terraform-aws-modules/terraform-aws-vpc", "v5.0.0", "."
+    )
+    assert "terraform-aws-vpc" in uri
+    assert "v5-0-0" in uri  # dots are replaced with hyphens
+    assert uri.startswith("module://")
+
+
+def test_list_module_resource_uris(sample_output_dir):
+    """Test listing module resource URIs."""
+    service = ModuleQueryService(sample_output_dir)
+    uris = service.list_module_resource_uris()
+
+    assert len(uris) == 3
+    assert all("uri" in u for u in uris)
+    assert all("repository" in u for u in uris)
+    assert all("ref" in u for u in uris)
+    assert all(u["uri"].startswith("module://") for u in uris)
+
+
+def test_get_module_document_aws_vpc(sample_output_dir):
+    """Test getting module documentation for AWS VPC."""
+    service = ModuleQueryService(sample_output_dir)
+    doc = service.get_module_document(
+        "https://github.com/terraform-aws-modules/terraform-aws-vpc", "main", "."
+    )
+
+    assert "terraform-aws-vpc" in doc or "terraform-aws" in doc
+    assert "# Terraform Module:" in doc
+    assert "aws_vpc" in doc
+    assert "aws_subnet" in doc
+    assert "## Resources" in doc
+    assert "## Providers" in doc
+
+
+def test_get_module_document_not_found(sample_output_dir):
+    """Test getting module documentation for non-existent module."""
+    service = ModuleQueryService(sample_output_dir)
+    doc = service.get_module_document("https://github.com/nonexistent/repo", "main", ".")
+
+    assert "Module not found" in doc
+
+
+def test_mcp_list_module_resource_uris_tool(sample_output_dir):
+    """Test the MCP list_module_resource_uris tool."""
+    from terraform_ingest.mcp_service import _list_module_resource_uris_impl
+
+    uris = _list_module_resource_uris_impl(output_dir=sample_output_dir)
+
+    assert len(uris) == 3
+    assert all("uri" in u for u in uris)
+    assert any(u["uri"].startswith("module://terraform-aws-vpc") for u in uris)
+
+
+def test_get_module_resource(sample_output_dir):
+    """Test getting module documentation via resource endpoint."""
+    from terraform_ingest.mcp_service import ModuleQueryService
+
+    service = ModuleQueryService(sample_output_dir)
+
+    # Get module document directly using the service method
+    doc = service.get_module_document(
+        "https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        "main",
+        "."
+    )
+
+    assert "# Terraform Module:" in doc
+    assert len(doc) > 100  # Should be substantial documentation
+    assert "aws_vpc" in doc
+
+
+def test_get_module_resource_impl_wrapper(sample_output_dir):
+    """Test the wrapper implementation for resource endpoints."""
+    # This test is more complex because it needs to match the repository by name
+    # For now, we'll test that the wrapper handles non-existent modules gracefully
+    from terraform_ingest.mcp_service import _get_module_resource_impl
+
+    # Test with a non-existent module
+    doc = _get_module_resource_impl(
+        repository="nonexistent", ref="main", path="-"
+    )
+    assert "Module not found" in doc
+
+
+def test_module_document_includes_sections(sample_output_dir):
+    """Test that module documentation includes all expected sections."""
+    service = ModuleQueryService(sample_output_dir)
+    doc = service.get_module_document(
+        "https://github.com/terraform-aws-modules/terraform-aws-vpc", "main", "."
+    )
+
+    # Check for all major sections
+    assert "# Terraform Module:" in doc
+    assert "## Resources" in doc or "aws_vpc" in doc
+    assert "## Providers" in doc
+    assert "## Input Variables" in doc or "## Outputs" in doc
+    assert "repository" in doc or "github.com" in doc

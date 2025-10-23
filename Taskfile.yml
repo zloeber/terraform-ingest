@@ -108,7 +108,7 @@ tasks:
     desc: Run the app
     cmds:
       - |
-        uv run -m metagit_detect.example
+        uv run -m terraform_ingest.cli
 
   lint:
     desc: Run python linting
@@ -157,7 +157,7 @@ tasks:
     cmds:
       - |
         uv pip install -e ".[dev]"
-        uv run mypy metagit/core
+        uv run mypy src
 
   secret:search:
     desc: Find secrets in the codebase and in git history
@@ -190,7 +190,7 @@ tasks:
         rm -rf .DS_Store
         rm -rf .pytest_cache
         rm -rf .venv
-        rm -rf src/metagit/_version.py
+        rm -rf src/terraform_ingest/_version.py
 
   deep:clean:
     desc: Clean the project deeply. Includes uv cache removal.
@@ -210,3 +210,11 @@ tasks:
       - task: docker:build
         vars:
           DOCKER_BUILD_ARGS: "--build-arg DEPLOY_VERSION={{.VERSION}}-$(git rev-parse --short HEAD)"
+
+  start:mcp:inspector:
+    desc: Start MCP Inspector
+    cmds:
+      - npx -y @modelcontextprotocol/inspector
+    env:
+      DANGEROUSLY_OMIT_AUTH: true
+

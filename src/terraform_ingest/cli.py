@@ -263,7 +263,7 @@ def init(config_file):
                 "name": "terraform-aws-vpc",
                 "branches": ["main", "develop"],
                 "include_tags": True,
-                "max_tags": 5,
+                "max_tags": 1,
                 "path": ".",
                 "recursive": False,
             },
@@ -446,17 +446,53 @@ def serve(host, port):
     default=None,
     help="Configuration file for auto-ingestion settings",
 )
-def mcp(config):
+@click.option(
+    "--transport",
+    "-t",
+    type=click.Choice(["stdio", "http-streamable", "sse"]),
+    default=None,
+    help="Transport mode (stdio, http-streamable, or sse)",
+)
+@click.option(
+    "--host",
+    "-h",
+    default=None,
+    help="Host to bind to (for http-streamable and sse transports)",
+)
+@click.option(
+    "--port",
+    "-p",
+    type=int,
+    default=None,
+    help="Port to bind to (for http-streamable and sse transports)",
+)
+@click.option(
+    "--ingest-on-startup/--no-ingest-on-startup",
+    default=None,
+    help="Run ingestion immediately on startup (overrides config)",
+)
+def mcp(config, transport, host, port, ingest_on_startup):
     """Start the MCP (Model Context Protocol) server.
 
     The MCP server exposes ingested Terraform modules to AI agents and supports
     auto-ingestion based on configuration settings.
+
+    Supported transports:
+    - stdio (default): Standard input/output communication
+    - http-streamable: HTTP with streaming support
+    - sse: Server-Sent Events over HTTP
 
     Example:
 
         terraform-ingest mcp
 
         terraform-ingest mcp --config my-config.yaml
+
+        terraform-ingest mcp --ingest-on-startup
+
+        terraform-ingest mcp --transport http-streamable --host 0.0.0.0 --port 3000
+
+        terraform-ingest mcp --transport sse --host localhost --port 8000 --ingest-on-startup
     """
     # Set the config file environment variable if provided
     if config is not None:
@@ -465,11 +501,21 @@ def mcp(config):
         config = os.getenv("TERRAFORM_INGEST_CONFIG", "config.yaml")
         os.environ["TERRAFORM_INGEST_CONFIG"] = config
 
-    click.echo(f"Starting MCP server with config: {config}")
-    click.echo("Press CTRL+C to quit")
+    if transport != "stdio" and transport is not None:
+        click.echo(f"Transport: {transport}")
+        click.echo(f"Address: {host or '127.0.0.1'}:{port or 3000}")
+        if ingest_on_startup is not None:
+            click.echo(f"Ingest on startup: {ingest_on_startup}")
+        click.echo("Press CTRL+C to quit")
 
     try:
-        mcp_main(config_file=config)
+        mcp_main(
+            config_file=config,
+            transport=transport,
+            host=host,
+            port=port,
+            ingest_on_startup=ingest_on_startup,
+        )
     except KeyboardInterrupt:
         click.echo("\nMCP server stopped")
 

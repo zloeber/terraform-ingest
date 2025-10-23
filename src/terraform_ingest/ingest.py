@@ -33,22 +33,23 @@ class TerraformIngest:
         config = IngestConfig(**config_dict)
         return cls(config)
 
-    def ingest(self) -> List[TerraformModuleSummary]:
+    def ingest(self, silent: bool = False) -> List[TerraformModuleSummary]:
         """Process all repositories and generate summaries."""
         all_summaries = []
 
         for repo_config in self.config.repositories:
-            print(f"Processing repository: {repo_config.url}")
-            summaries = self.repo_manager.process_repository(repo_config)
+            if not silent:
+                print(f"Processing repository: {repo_config.url}")
+            summaries = self.repo_manager.process_repository(repo_config, silent=silent)
             all_summaries.extend(summaries)
 
             # Save summaries for this repository
             for summary in summaries:
-                self._save_summary(summary)
+                self._save_summary(summary, silent=silent)
 
         return all_summaries
 
-    def _save_summary(self, summary: TerraformModuleSummary):
+    def _save_summary(self, summary: TerraformModuleSummary, silent: bool = False):
         """Save a summary to a JSON file."""
         # Create a safe filename from repository, ref, and path
         repo_name = summary.repository.rstrip("/").split("/")[-1]
@@ -65,20 +66,22 @@ class TerraformIngest:
         else:
             filename = f"{repo_name}_{ref_name}.json"
 
-        output_path = self.output_dir / filename
+        output_path = Path.joinpath(self.output_dir, filename)
 
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(summary.model_dump(), f, indent=2, default=str)
-
-        print(f"Saved summary to {output_path}")
+        if not silent:
+            print(f"Saved summary to {output_path}")
 
         # Upsert to vector database if enabled
         if self.vector_db:
             try:
                 doc_id = self.vector_db.upsert_module(summary)
-                print(f"Upserted to vector database with ID: {doc_id}")
+                if not silent:
+                    print(f"Upserted to vector database with ID: {doc_id}")
             except Exception as e:
-                print(f"Warning: Failed to upsert to vector database: {e}")
+                if not silent:
+                    print(f"Warning: Failed to upsert to vector database: {e}")
 
     def get_all_summaries_json(self) -> str:
         """Get all summaries as a single JSON string."""
