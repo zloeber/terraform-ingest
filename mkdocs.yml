@@ -29,7 +29,7 @@ markdown_extensions:
           format: !!python/name:mermaid2.fence_mermaid_custom
 plugins:
 - llmstxt:
-    markdown_description: Documentation for the Metagit-AI CLI project
+    markdown_description: Documentation for the Terraform Ingest project
     full_output: llms-full.txt
     sections:
       Usage documentation:

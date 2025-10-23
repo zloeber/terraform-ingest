@@ -12,7 +12,10 @@ from terraform_ingest.models import IngestConfig
 from terraform_ingest.ingest import TerraformIngest
 
 # Initialize FastMCP server
-mcp = FastMCP("terraform-ingest")
+mcp = FastMCP(
+    name = "terraform-ingest"
+    instructions="Service for querying ingested Terraform modules from Git repositories."
+)
 
 
 class ModuleQueryService:
