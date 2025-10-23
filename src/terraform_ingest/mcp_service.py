@@ -267,6 +267,67 @@ def search_modules(
     return service.search_modules(query=query, repo_urls=repo_urls, provider=provider)
 
 
+@mcp.tool()
+def search_modules_vector(
+    query: str,
+    provider: Optional[str] = None,
+    repository: Optional[str] = None,
+    limit: int = 10,
+    config_file: str = "config.yaml",
+) -> List[Dict[str, Any]]:
+    """Searches for Terraform modules using semantic vector search.
+
+    This tool uses vector embeddings to find semantically similar modules based
+    on natural language queries. It's more powerful than keyword search for
+    understanding user intent.
+
+    Args:
+        query: Natural language search query (e.g., "module for creating VPCs in AWS")
+        provider: Optional filter by provider (e.g., "aws", "azurerm", "google")
+        repository: Optional filter by repository URL
+        limit: Maximum number of results to return (default: 10)
+        config_file: Path to configuration file with vector DB settings (default: config.yaml)
+
+    Returns:
+        List of matching modules with relevance scores including:
+        - id: Unique document ID
+        - metadata: Module metadata (repository, ref, path, provider, tags, last_updated)
+        - document: Embedded text content
+        - distance: Similarity score (lower is better)
+    """
+    try:
+        # Load config to get vector DB settings
+        ingester = TerraformIngest.from_yaml(config_file)
+        
+        if not ingester.vector_db:
+            return [{
+                "error": "Vector database is not enabled in the configuration",
+                "message": "Enable it by setting 'embedding.enabled: true' in your config file"
+            }]
+        
+        # Prepare filters
+        filters = {}
+        if provider:
+            filters["provider"] = provider
+        if repository:
+            filters["repository"] = repository
+        
+        # Search
+        results = ingester.search_vector_db(
+            query, 
+            filters=filters if filters else None, 
+            n_results=limit
+        )
+        
+        return results
+        
+    except Exception as e:
+        return [{
+            "error": str(e),
+            "message": "Failed to search vector database"
+        }]
+
+
 # Testable wrapper functions (not decorated with @mcp.tool())
 def _list_repositories_impl(
     filter: Optional[str] = None, limit: int = 50, output_dir: str = "./output"

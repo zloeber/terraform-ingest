@@ -8,6 +8,7 @@ from terraform_ingest.models import (
     TerraformModuleSummary,
     RepositoryConfig,
     IngestConfig,
+    EmbeddingConfig,
 )
 
 
@@ -97,3 +98,38 @@ def test_ingest_config():
     )
     assert len(config.repositories) == 1
     assert config.output_dir == "./test_output"
+
+
+def test_embedding_config():
+    """Test EmbeddingConfig model."""
+    config = EmbeddingConfig(
+        enabled=True,
+        strategy="sentence-transformers",
+        chromadb_path="./test_chromadb",
+        collection_name="test_modules",
+    )
+    assert config.enabled is True
+    assert config.strategy == "sentence-transformers"
+    assert config.chromadb_path == "./test_chromadb"
+    assert config.collection_name == "test_modules"
+
+
+def test_ingest_config_with_embedding():
+    """Test IngestConfig with embedding configuration."""
+    repo_config = RepositoryConfig(
+        url="https://github.com/user/terraform-module",
+    )
+    embedding_config = EmbeddingConfig(
+        enabled=True,
+        strategy="chromadb-default",
+    )
+    config = IngestConfig(
+        repositories=[repo_config],
+        output_dir="./test_output",
+        clone_dir="./test_repos",
+        embedding=embedding_config,
+    )
+    assert len(config.repositories) == 1
+    assert config.embedding is not None
+    assert config.embedding.enabled is True
+    assert config.embedding.strategy == "chromadb-default"
