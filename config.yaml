@@ -29,6 +29,9 @@ mcp:
   ingest_on_startup: true         # Run ingestion immediately on startup  
   refresh_interval_hours: 6       # Auto-refresh every 6 hours (null to disable)
   config_file: config.yaml        # Configuration file to use for auto-ingestion
+  instructions: |
+    Service for querying ingested Terraform modules from Git repositories. 
+    Provides tools to list repositories and search modules by keywords, providers, or other criteria.
 
 # Vector database embedding configuration
 embedding:

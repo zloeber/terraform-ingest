@@ -71,6 +71,9 @@ class McpConfig(BaseModel):
     auto_ingest: bool = False
     ingest_on_startup: bool = False
     refresh_interval_hours: Optional[int] = None
+    instructions: str = (
+        "Service for querying ingested Terraform modules from Git repositories."
+    )
 
 
 class EmbeddingConfig(BaseModel):

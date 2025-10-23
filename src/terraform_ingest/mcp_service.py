@@ -11,10 +11,11 @@ from fastmcp import FastMCP
 from terraform_ingest.models import IngestConfig
 from terraform_ingest.ingest import TerraformIngest
 
-# Initialize FastMCP server
+# Initialize FastMCP server with default instructions
+# These will be updated when the config is loaded
 mcp = FastMCP(
-    name = "terraform-ingest"
-    instructions="Service for querying ingested Terraform modules from Git repositories."
+    name="terraform-ingest",
+    instructions="Service for querying ingested Terraform modules from Git repositories.",
 )
 
 
@@ -364,6 +365,22 @@ def _load_config_file(config_file: str = "config.yaml") -> Optional[IngestConfig
         return None
 
 
+def _update_mcp_instructions(config: Optional[IngestConfig]):
+    """Update FastMCP server instructions from configuration.
+
+    Args:
+        config: Loaded IngestConfig, or None to use default instructions
+    """
+    global mcp
+
+    if config and config.mcp and config.mcp.instructions:
+        mcp.instructions = config.mcp.instructions
+    else:
+        mcp.instructions = (
+            "Service for querying ingested Terraform modules from Git repositories."
+        )
+
+
 def _run_ingestion(config_file: str = "config.yaml"):
     """Run ingestion process from configuration file."""
     try:
@@ -408,6 +425,9 @@ def start(config_file: str = None):
 
     config = _load_config_file(config_file)
 
+    # Update MCP instructions from configuration
+    _update_mcp_instructions(config)
+
     if config and config.mcp:
         mcp_config = config.mcp
     else:
@@ -434,6 +454,9 @@ def main():
     # Check for MCP configuration and auto-ingestion
     config_file = os.getenv("TERRAFORM_INGEST_CONFIG", "config.yaml")
     config = _load_config_file(config_file)
+
+    # Update MCP instructions from configuration
+    _update_mcp_instructions(config)
 
     if config and config.mcp:
         mcp_config = config.mcp
