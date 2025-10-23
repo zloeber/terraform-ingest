@@ -1,17 +1,19 @@
 # terraform-ingest
 
-A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file of terraform git repository sources, downloads them locally using existing credentials, creates JSON summaries of their purpose, inputs, outputs, and providers for branches or tagged releases you specify for ingestion via a RAG pipeline into a vector database. Includes an easy to use cli, api, or mcp server.
+A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file of terraform git repository sources, downloads them locally using existing credentials, creates JSON summaries of their purpose, inputs, outputs, and providers for branches or tagged releases you specify for ingestion via a RAG pipeline into a vector database. Includes an easy to use cli, API, or MCP server.
 
 <!---toc start-->
 
 * [terraform-ingest](#terraform-ingest)
   * [Features](#features)
   * [Installation](#installation)
+    * [Optional: Install with Vector Database Support](#optional-install-with-vector-database-support)
   * [Usage](#usage)
     * [CLI Interface](#cli-interface)
       * [Initialize a Configuration File](#initialize-a-configuration-file)
       * [Ingest Repositories from Configuration](#ingest-repositories-from-configuration)
       * [Analyze a Single Repository](#analyze-a-single-repository)
+      * [Search with Vector Database](#search-with-vector-database)
     * [MCP Service for AI Agents](#mcp-service-for-ai-agents)
       * [Start the MCP Server](#start-the-mcp-server)
       * [MCP Tools](#mcp-tools)
@@ -27,6 +29,12 @@ A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file o
   * [Use Cases](#use-cases)
     * [RAG Pipeline Integration](#rag-pipeline-integration)
     * [Example RAG Workflow](#example-rag-workflow)
+  * [Vector Database Embeddings](#vector-database-embeddings)
+    * [Quick Start](#quick-start)
+    * [Features](#features-1)
+    * [Embedding Strategies](#embedding-strategies)
+    * [Documentation](#documentation)
+    * [Example Queries](#example-queries)
   * [Development](#development)
     * [Running Tests](#running-tests)
     * [Code Quality](#code-quality)

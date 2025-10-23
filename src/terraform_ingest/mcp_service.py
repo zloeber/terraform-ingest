@@ -298,34 +298,31 @@ def search_modules_vector(
     try:
         # Load config to get vector DB settings
         ingester = TerraformIngest.from_yaml(config_file)
-        
+
         if not ingester.vector_db:
-            return [{
-                "error": "Vector database is not enabled in the configuration",
-                "message": "Enable it by setting 'embedding.enabled: true' in your config file"
-            }]
-        
+            return [
+                {
+                    "error": "Vector database is not enabled in the configuration",
+                    "message": "Enable it by setting 'embedding.enabled: true' in your config file",
+                }
+            ]
+
         # Prepare filters
         filters = {}
         if provider:
             filters["provider"] = provider
         if repository:
             filters["repository"] = repository
-        
+
         # Search
         results = ingester.search_vector_db(
-            query, 
-            filters=filters if filters else None, 
-            n_results=limit
+            query, filters=filters if filters else None, n_results=limit
         )
-        
+
         return results
-        
+
     except Exception as e:
-        return [{
-            "error": str(e),
-            "message": "Failed to search vector database"
-        }]
+        return [{"error": str(e), "message": "Failed to search vector database"}]
 
 
 # Testable wrapper functions (not decorated with @mcp.tool())
@@ -375,7 +372,7 @@ def _run_ingestion(config_file: str = "config.yaml"):
         print(f"Error during auto-ingestion: {e}")
 
 
-def _start_periodic_ingestion(config: IngestConfig):
+def _start_periodic_ingestion(config: IngestConfig, config_file: str):
     """Start periodic ingestion in a background thread."""
     if not config.mcp or not config.mcp.refresh_interval_hours:
         return
@@ -387,7 +384,7 @@ def _start_periodic_ingestion(config: IngestConfig):
             print(
                 f"Running scheduled ingestion (every {config.mcp.refresh_interval_hours}h)"
             )
-            _run_ingestion(config.mcp.config_file)
+            _run_ingestion(config_file)
 
     thread = threading.Thread(target=periodic_runner, daemon=True)
     thread.start()
@@ -395,8 +392,13 @@ def _start_periodic_ingestion(config: IngestConfig):
         f"Started periodic ingestion thread (every {config.mcp.refresh_interval_hours}h)"
     )
 
+
 def start(config_file: str = None):
-    """Run the FastMCP server."""
+    """Run the FastMCP server.
+
+    Args:
+        config_file: Path to the configuration file (default: TERRAFORM_INGEST_CONFIG env var or "config.yaml")
+    """
     # Check for MCP configuration and auto-ingestion
     if config_file is None:
         config_file = os.getenv("TERRAFORM_INGEST_CONFIG", "config.yaml")
@@ -405,21 +407,24 @@ def start(config_file: str = None):
 
     if config and config.mcp:
         mcp_config = config.mcp
+    else:
+        mcp_config = None
 
     print(f"MCP Configuration File: {config_file}")
     print(f"MCP Config: {mcp_config}")
 
     # Run ingestion on startup if enabled
-    if mcp_config.auto_ingest and mcp_config.ingest_on_startup:
+    if mcp_config and mcp_config.ingest_on_startup:
         print("MCP auto-ingestion enabled, running initial ingestion...")
-        _run_ingestion(mcp_config.config_file)
+        _run_ingestion(config_file)
 
     # Start periodic ingestion if configured
-    if mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
-        _start_periodic_ingestion(config)
+    if mcp_config and mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
+        _start_periodic_ingestion(config, config_file)
 
     print("Starting FastMCP server...")
     mcp.run()
+
 
 def main():
     """Run the FastMCP server."""
@@ -431,13 +436,13 @@ def main():
         mcp_config = config.mcp
 
         # Run ingestion on startup if enabled
-        if mcp_config.auto_ingest and mcp_config.ingest_on_startup:
+        if mcp_config.ingest_on_startup:
             print("MCP auto-ingestion enabled, running initial ingestion...")
-            _run_ingestion(mcp_config.config_file)
+            _run_ingestion(config_file)
 
         # Start periodic ingestion if configured
         if mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
-            _start_periodic_ingestion(config)
+            _start_periodic_ingestion(config, config_file)
     else:
         print("No MCP configuration found or auto-ingestion disabled")
 

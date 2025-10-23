@@ -49,7 +49,7 @@ class AnalyzeRequest(BaseModel):
 
 class VectorSearchRequest(BaseModel):
     """Request model for vector search."""
-    
+
     query: str
     provider: Optional[str] = None
     repository: Optional[str] = None
@@ -59,7 +59,7 @@ class VectorSearchRequest(BaseModel):
 
 class VectorSearchResponse(BaseModel):
     """Response model for vector search."""
-    
+
     results: List[dict]
     count: int
     query: str
@@ -211,46 +211,42 @@ async def ingest_from_yaml(yaml_content: str):
 @app.post("/search/vector", response_model=VectorSearchResponse)
 async def search_vector(request: VectorSearchRequest):
     """Search for Terraform modules using vector embeddings.
-    
+
     This endpoint uses semantic search to find modules based on natural
     language queries. Vector database must be enabled in the configuration.
-    
+
     Args:
         request: VectorSearchRequest with query and filters
-        
+
     Returns:
         VectorSearchResponse with matching modules and relevance scores
     """
     try:
         # Load config to get vector DB settings
         ingester = TerraformIngest.from_yaml(request.config_file)
-        
+
         if not ingester.vector_db:
             raise HTTPException(
                 status_code=400,
-                detail="Vector database is not enabled. Set 'embedding.enabled: true' in config."
+                detail="Vector database is not enabled. Set 'embedding.enabled: true' in config.",
             )
-        
+
         # Prepare filters
         filters = {}
         if request.provider:
             filters["provider"] = request.provider
         if request.repository:
             filters["repository"] = request.repository
-        
+
         # Search
         results = ingester.search_vector_db(
-            request.query,
-            filters=filters if filters else None,
-            n_results=request.limit
+            request.query, filters=filters if filters else None, n_results=request.limit
         )
-        
+
         return VectorSearchResponse(
-            results=results,
-            count=len(results),
-            query=request.query
+            results=results, count=len(results), query=request.query
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:

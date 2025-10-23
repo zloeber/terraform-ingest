@@ -56,3 +56,5 @@ output/
 .env
 site/
 config.client.yaml
+chromadb/
+.ruff_cache/

@@ -56,11 +56,21 @@ def cli():
 )
 @click.option(
     "--embedding-strategy",
-    type=click.Choice(["openai", "claude", "sentence-transformers", "chromadb-default"]),
+    type=click.Choice(
+        ["openai", "claude", "sentence-transformers", "chromadb-default"]
+    ),
     default=None,
     help="Embedding strategy to use (overrides config)",
 )
-def ingest(config_file, output_dir, clone_dir, cleanup, no_cache, enable_embeddings, embedding_strategy):
+def ingest(
+    config_file,
+    output_dir,
+    clone_dir,
+    cleanup,
+    no_cache,
+    enable_embeddings,
+    embedding_strategy,
+):
     """Ingest terraform repositories from a YAML configuration file.
 
     CONFIG_FILE: Path to the YAML configuration file containing repository sources.
@@ -70,7 +80,7 @@ def ingest(config_file, output_dir, clone_dir, cleanup, no_cache, enable_embeddi
         terraform-ingest ingest config.yaml
 
         terraform-ingest ingest config.yaml -o ./my-output -c ./my-repos
-        
+
         terraform-ingest ingest config.yaml --enable-embeddings --embedding-strategy sentence-transformers
     """
     click.echo(f"Loading configuration from {config_file}")
@@ -86,23 +96,30 @@ def ingest(config_file, output_dir, clone_dir, cleanup, no_cache, enable_embeddi
         if clone_dir is not None:
             ingester.config.clone_dir = clone_dir
             ingester.repo_manager.clone_dir = Path(clone_dir)
-        
+
         # Override embedding config if provided
         if enable_embeddings is not None:
             if ingester.config.embedding is None:
                 from terraform_ingest.models import EmbeddingConfig
+
                 ingester.config.embedding = EmbeddingConfig()
             ingester.config.embedding.enabled = enable_embeddings
-            
+
         if embedding_strategy is not None:
             if ingester.config.embedding is None:
                 from terraform_ingest.models import EmbeddingConfig
+
                 ingester.config.embedding = EmbeddingConfig()
             ingester.config.embedding.strategy = embedding_strategy
-        
+
         # Reinitialize vector DB if embedding config was overridden
-        if (enable_embeddings is not None or embedding_strategy is not None) and ingester.config.embedding and ingester.config.embedding.enabled:
+        if (
+            (enable_embeddings is not None or embedding_strategy is not None)
+            and ingester.config.embedding
+            and ingester.config.embedding.enabled
+        ):
             from terraform_ingest.embeddings import VectorDBManager
+
             ingester.vector_db = VectorDBManager(ingester.config.embedding)
 
         if no_cache:
@@ -118,12 +135,12 @@ def ingest(config_file, output_dir, clone_dir, cleanup, no_cache, enable_embeddi
         click.echo("\nIngestion complete!")
         click.echo(f"Processed {len(summaries)} module(s)")
         click.echo(f"Summaries saved to {ingester.output_dir}")
-        
+
         # Show vector DB stats if enabled
         if ingester.vector_db:
             stats = ingester.get_vector_db_stats()
             if stats.get("enabled"):
-                click.echo(f"\nVector Database Statistics:")
+                click.echo("\nVector Database Statistics:")
                 click.echo(f"  Collection: {stats.get('collection_name')}")
                 click.echo(f"  Documents: {stats.get('document_count')}")
                 click.echo(f"  Strategy: {stats.get('embedding_strategy')}")
@@ -244,27 +261,62 @@ def init(config_file):
             {
                 "url": "https://github.com/terraform-aws-modules/terraform-aws-vpc",
                 "name": "terraform-aws-vpc",
-                "branches": ["main"],
+                "branches": ["main", "develop"],
                 "include_tags": True,
                 "max_tags": 5,
                 "path": ".",
-            }
+                "recursive": False,
+            },
+            {
+                "url": "https://github.com/terraform-aws-modules/terraform-aws-ec2-instance",
+                "name": "terraform-aws-ec2-instance",
+                "branches": ["main"],
+                "include_tags": True,
+                "max_tags": 3,
+                "path": ".",
+                "recursive": True,
+            },
         ],
         "output_dir": "./output",
         "clone_dir": "./repos",
+        "mcp": {
+            "auto_ingest": False,
+            "ingest_on_startup": False,
+            "refresh_interval_hours": None,
+        },
         "embedding": {
             "enabled": False,
             "strategy": "chromadb-default",
+            "openai_api_key": None,
+            "anthropic_api_key": None,
+            "openai_model": "text-embedding-3-small",
+            "anthropic_model": "claude-3-haiku-20240307",
+            "sentence_transformers_model": "all-MiniLM-L6-v2",
+            "chromadb_host": None,
+            "chromadb_port": 8000,
             "chromadb_path": "./chromadb",
             "collection_name": "terraform_modules",
-        }
+            "include_description": True,
+            "include_readme": True,
+            "include_variables": True,
+            "include_outputs": True,
+            "include_resource_types": True,
+            "enable_hybrid_search": True,
+            "keyword_weight": 0.3,
+            "vector_weight": 0.7,
+        },
     }
 
     with open(config_path, "w") as f:
         yaml.dump(sample_config, f, default_flow_style=False, sort_keys=False)
 
     click.echo(f"Created sample configuration at {config_file}")
-    click.echo("\nEdit this file to add your terraform repositories, then run:")
+    click.echo("\nConfiguration includes:")
+    click.echo("  • Multiple repositories with different branch/tag settings")
+    click.echo("  • Output and clone directories")
+    click.echo("  • MCP service configuration options")
+    click.echo("  • Comprehensive embedding configuration with multiple strategies")
+    click.echo("\nEdit this file to customize for your needs, then run:")
     click.echo(f"  terraform-ingest ingest {config_file}")
 
 
@@ -298,42 +350,49 @@ def init(config_file):
 )
 def search(query, config, provider, repository, limit):
     """Search the vector database for Terraform modules.
-    
+
     QUERY: Search query (natural language or keywords)
-    
+
     Example:
-    
+
         terraform-ingest search "vpc module for aws"
-        
+
         terraform-ingest search "kubernetes" --provider aws --limit 5
     """
     click.echo(f"Searching for: {query}")
-    
+
     try:
         # Load config to get vector DB settings
         ingester = TerraformIngest.from_yaml(config)
-        
+
         if not ingester.vector_db:
-            click.echo("Error: Vector database is not enabled in the configuration", err=True)
-            click.echo("Enable it by setting 'embedding.enabled: true' in your config file", err=True)
+            click.echo(
+                "Error: Vector database is not enabled in the configuration", err=True
+            )
+            click.echo(
+                "Enable it by setting 'embedding.enabled: true' in your config file",
+                err=True,
+            )
             raise click.Abort()
-        
+
         # Prepare filters
         filters = {}
         if provider:
             filters["provider"] = provider
         if repository:
             filters["repository"] = repository
-        
+
         # Search
-        results = ingester.search_vector_db(query, filters=filters if filters else None, n_results=limit)
-        
+        results = ingester.search_vector_db(
+            query, filters=filters if filters else None, n_results=limit
+        )
+
         if not results:
             click.echo("No results found")
             return
-        
+
         click.echo(f"\nFound {len(results)} result(s):\n")
-        
+
         for i, result in enumerate(results, 1):
             metadata = result.get("metadata", {})
             click.echo(f"{i}. {metadata.get('repository', 'Unknown')}")
@@ -343,7 +402,7 @@ def search(query, config, provider, repository, limit):
             if result.get("distance") is not None:
                 click.echo(f"   Relevance: {1.0 - result['distance']:.3f}")
             click.echo()
-            
+
     except Exception as e:
         click.echo(f"Error during search: {e}", err=True)
         raise click.Abort()

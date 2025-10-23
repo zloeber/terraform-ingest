@@ -3,6 +3,7 @@ name = "terraform-ingest"
 dynamic = ["version"]
 requires-python = ">=3.12"
 dependencies = [
+    "chromadb>=1.2.1",
     "click>=8.3.0",
     "fastapi>=0.119.0",
     "fastmcp>=0.5.0",
@@ -12,6 +13,8 @@ dependencies = [
     "pydantic>=2.12.2",
     "python-hcl2>=7.3.1",
     "pyyaml>=6.0.3",
+    "sentence-transformers>=5.1.2",
+    "urllib3>=2.5.0",
     "uvicorn>=0.37.0",
 ]
 authors = [

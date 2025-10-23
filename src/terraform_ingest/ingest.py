@@ -18,7 +18,7 @@ class TerraformIngest:
         self.repo_manager = RepositoryManager(config.clone_dir)
         self.output_dir = Path(config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize vector database manager if enabled
         self.vector_db = None
         if config.embedding and config.embedding.enabled:
@@ -71,7 +71,7 @@ class TerraformIngest:
             json.dump(summary.model_dump(), f, indent=2, default=str)
 
         print(f"Saved summary to {output_path}")
-        
+
         # Upsert to vector database if enabled
         if self.vector_db:
             try:
@@ -88,21 +88,23 @@ class TerraformIngest:
     def cleanup(self):
         """Clean up temporary files."""
         self.repo_manager.cleanup()
-    
+
     def get_vector_db_stats(self):
         """Get vector database statistics."""
         if self.vector_db:
             return self.vector_db.get_collection_stats()
         return {"enabled": False}
-    
-    def search_vector_db(self, query: str, filters: Optional[dict] = None, n_results: int = 10):
+
+    def search_vector_db(
+        self, query: str, filters: Optional[dict] = None, n_results: int = 10
+    ):
         """Search the vector database.
-        
+
         Args:
             query: Search query
             filters: Optional metadata filters
             n_results: Number of results to return
-            
+
         Returns:
             List of matching modules
         """
