@@ -75,6 +75,12 @@ class McpConfig(BaseModel):
     auto_ingest: bool = False
     ingest_on_startup: bool = False
     refresh_interval_hours: Optional[int] = None
+
+    # Transport configuration
+    transport: Literal["stdio", "http-streamable", "sse"] = "stdio"
+    host: str = "127.0.0.1"
+    port: int = 3000
+
     instructions: str = (
         """
     You are a Terraform module assistant that helps users find and use infrastructure modules.

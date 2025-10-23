@@ -19,13 +19,14 @@ class RepositoryManager:
         self.clone_dir.mkdir(parents=True, exist_ok=True)
 
     def process_repository(
-        self, repo_config: RepositoryConfig
+        self, repo_config: RepositoryConfig, silent: bool = False
     ) -> List[TerraformModuleSummary]:
         """Process a repository and return summaries for all refs."""
         summaries = []
 
         if len(repo_config.branches) == 0 and not repo_config.include_tags:
-            print("No branches or tags specified to process.")
+            if not silent:
+                print("No branches or tags specified to process.")
             return summaries
 
         # Determine repository name
@@ -44,11 +45,17 @@ class RepositoryManager:
         for branch in repo_config.branches:
             try:
                 branch_summaries = self._process_ref(
-                    repo, repo_config, branch, repo_path, repo_config.path
+                    repo,
+                    repo_config,
+                    branch,
+                    repo_path,
+                    repo_config.path,
+                    silent=silent,
                 )
                 summaries.extend(branch_summaries)
             except Exception as e:
-                print(f"Error processing branch {branch}: {e}")
+                if not silent:
+                    print(f"Error processing branch {branch}: {e}")
 
         # Process tags if enabled
         if repo_config.include_tags:
@@ -56,11 +63,17 @@ class RepositoryManager:
             for tag in tags:
                 try:
                     tag_summaries = self._process_ref(
-                        repo, repo_config, tag, repo_path, repo_config.path
+                        repo,
+                        repo_config,
+                        tag,
+                        repo_path,
+                        repo_config.path,
+                        silent=silent,
                     )
                     summaries.extend(tag_summaries)
                 except Exception as e:
-                    print(f"Error processing tag {tag}: {e}")
+                    if not silent:
+                        print(f"Error processing tag {tag}: {e}")
 
         return summaries
 
@@ -88,6 +101,7 @@ class RepositoryManager:
         ref: str,
         repo_path: Path,
         module_path: str = ".",
+        silent: bool = False,
     ) -> List[TerraformModuleSummary]:
         """Process a specific git ref (branch or tag)."""
 
@@ -104,12 +118,15 @@ class RepositoryManager:
                 # For tags, check if ref exists in tags
                 tag_names = [tag.name for tag in repo.tags]
                 if ref not in tag_names:
-                    print(f"Ref '{ref}' does not exist in repository")
+                    if not silent:
+                        print(f"Ref '{ref}' does not exist in repository")
                     return []
 
-            print(f"Processing ref: {ref}")
+            if not silent:
+                print(f"Processing ref: {ref}")
         except Exception as e:
-            print(f"Error validating ref {ref}: {e}")
+            if not silent:
+                print(f"Error validating ref {ref}: {e}")
             return summaries
         try:
             # Checkout the ref
@@ -133,7 +150,8 @@ class RepositoryManager:
 
             return summaries
         except Exception as e:
-            print(f"Error processing ref {ref}: {e}")
+            if not silent:
+                print(f"Error processing ref {ref}: {e}")
             return []
 
     def _find_module_paths(

@@ -210,3 +210,11 @@ tasks:
       - task: docker:build
         vars:
           DOCKER_BUILD_ARGS: "--build-arg DEPLOY_VERSION={{.VERSION}}-$(git rev-parse --short HEAD)"
+
+  start:mcp:inspector:
+    desc: Start MCP Inspector
+    cmds:
+      - npx -y @modelcontextprotocol/inspector
+    env:
+      DANGEROUSLY_OMIT_AUTH: true
+

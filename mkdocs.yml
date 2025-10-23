@@ -32,8 +32,16 @@ plugins:
     markdown_description: Documentation for the Terraform Ingest project
     full_output: llms-full.txt
     sections:
-      Usage documentation:
+      Usage:
       - index.md: Index
       - QUICKSTART.md: Quickstart Guide
-      - DOCKER.md: Docker usage
+      - QUICKSTART_EMBEDDINGS.md: Quickstart with Embeddings
+      - DEVELOPMENT.md: Development Guide
+      - VECTORDB.md: Vector Database Setup
       - MCP.md: MCP Server usage
+      Docker:
+      - DOCKER.md: Docker usage
+      - DOCKER_ARCHITECTURE.md: Docker Architecture
+      - DOCKER_USAGE_GUIDE.md: Docker Usage Guide
+      - DOCKER_QUICK_REFERENCE.md: Docker Quick Reference
+      - DOCKER_COMPLETE.md: Docker Complete Reference

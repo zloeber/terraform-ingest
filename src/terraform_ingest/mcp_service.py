@@ -43,7 +43,7 @@ class ModuleQueryService:
                     summary = json.load(f)
                     summaries.append(summary)
             except Exception as e:
-                print(f"Error loading {json_file}: {e}")
+                _log(f"Error loading {json_file}: {e}")
 
         return summaries
 
@@ -223,6 +223,56 @@ class ModuleQueryService:
 # Global service instance
 _service: Optional[ModuleQueryService] = None
 
+# Global context for MCP server
+_ingester: Optional[TerraformIngest] = None
+_config: Optional[IngestConfig] = None
+_vector_db_enabled: bool = False
+_stdio_mode: bool = False  # Flag to suppress output in stdio mode
+
+
+def _log(message: str) -> None:
+    """Print message only if not in stdio mode.
+
+    Args:
+        message: Message to print
+    """
+    global _stdio_mode
+    if not _stdio_mode:
+        print(message)
+
+
+def set_mcp_context(
+    ingester: TerraformIngest,
+    config: IngestConfig,
+    vector_db_enabled: bool,
+    stdio_mode: bool = False,
+) -> None:
+    """Set the global MCP context with server configuration.
+
+    Args:
+        ingester: Configured TerraformIngest instance
+        config: Loaded configuration
+        vector_db_enabled: Whether vector database is enabled
+        stdio_mode: Whether running in stdio mode (suppresses output)
+    """
+    global _ingester, _config, _vector_db_enabled, _stdio_mode
+    _ingester = ingester
+    _config = config
+    _vector_db_enabled = vector_db_enabled
+    _stdio_mode = stdio_mode
+
+    # Conditionally register the search_modules_vector tool
+    if vector_db_enabled:
+        # Register the tool if not already registered
+        try:
+            mcp.register_tool(search_modules_vector)
+            _log("Vector database enabled - search_modules_vector tool registered")
+        except Exception as e:
+            # Tool might already be registered, which is fine
+            _log(f"Vector database enabled - search_modules_vector tool (already registered or skipped: {e})")
+    else:
+        _log("Vector database disabled - search_modules_vector tool not registered")
+
 
 def get_service(output_dir: str = "./output") -> ModuleQueryService:
     """Get or create the module query service instance."""
@@ -341,7 +391,6 @@ def search_modules_vector(
     provider: Optional[str] = None,
     repository: Optional[str] = None,
     limit: int = 10,
-    config_file: str = "config.yaml",
 ) -> List[Dict[str, Any]]:
     """Searches for Terraform modules using semantic vector search.
 
@@ -354,7 +403,6 @@ def search_modules_vector(
         provider: Optional filter by provider (e.g., "aws", "azurerm", "google")
         repository: Optional filter by repository URL
         limit: Maximum number of results to return (default: 10)
-        config_file: Path to configuration file with vector DB settings (default: config.yaml)
 
     Returns:
         List of matching modules with relevance scores including:
@@ -363,14 +411,14 @@ def search_modules_vector(
         - document: Embedded text content
         - distance: Similarity score (lower is better)
     """
-    try:
-        # Load config to get vector DB settings
-        ingester = TerraformIngest.from_yaml(config_file)
+    global _ingester
 
-        if not ingester.vector_db:
+    try:
+        # Use the ingester from the running context
+        if not _ingester or not _ingester.vector_db:
             return [
                 {
-                    "error": "Vector database is not enabled in the configuration",
+                    "error": "Vector database is not enabled",
                     "message": "Enable it by setting 'embedding.enabled: true' in your config file",
                 }
             ]
@@ -383,7 +431,7 @@ def search_modules_vector(
             filters["repository"] = repository
 
         # Search
-        results = ingester.search_vector_db(
+        results = _ingester.search_vector_db(
             query, filters=filters if filters else None, n_results=limit
         )
 
@@ -429,14 +477,14 @@ def _load_config_file(config_file: str = "config.yaml") -> Optional[IngestConfig
     """Load configuration file if it exists."""
     config_path = Path(config_file)
     if not config_path.exists():
-        print(f"Config file {config_file} not found, skipping auto-ingestion")
+        _log(f"Config file {config_file} not found, skipping auto-ingestion")
         return None
 
     try:
         ingester = TerraformIngest.from_yaml(str(config_path))
         return ingester.config
     except Exception as e:
-        print(f"Error loading config file {config_file}: {e}")
+        _log(f"Error loading config file {config_file}: {e}")
         return None
 
 
@@ -456,18 +504,22 @@ def _update_mcp_instructions(config: Optional[IngestConfig]):
         )
 
 
-def _run_ingestion(config_file: str = "config.yaml"):
+def _run_ingestion(config_file: str = "config.yaml", silent: bool = False):
     """Run ingestion process from configuration file."""
     try:
-        print(f"Starting auto-ingestion from {config_file}...")
+        if not silent:
+            _log(f"Starting auto-ingestion from {config_file}...")
         ingester = TerraformIngest.from_yaml(config_file)
-        summaries = ingester.ingest()
-        print(f"Auto-ingestion completed: {len(summaries)} modules processed")
+        summaries = ingester.ingest(silent=silent)
+        if not silent:
+            _log(f"Auto-ingestion completed: {len(summaries)} modules processed")
     except Exception as e:
-        print(f"Error during auto-ingestion: {e}")
+        _log(f"Error during auto-ingestion: {e}")
 
 
-def _start_periodic_ingestion(config: IngestConfig, config_file: str):
+def _start_periodic_ingestion(
+    config: IngestConfig, config_file: str, silent: bool = False
+):
     """Start periodic ingestion in a background thread."""
     if not config.mcp or not config.mcp.refresh_interval_hours:
         return
@@ -476,23 +528,35 @@ def _start_periodic_ingestion(config: IngestConfig, config_file: str):
         interval_seconds = config.mcp.refresh_interval_hours * 3600
         while True:
             time.sleep(interval_seconds)
-            print(
-                f"Running scheduled ingestion (every {config.mcp.refresh_interval_hours}h)"
-            )
-            _run_ingestion(config_file)
+            if not silent:
+                _log(
+                    f"Running scheduled ingestion (every {config.mcp.refresh_interval_hours}h)"
+                )
+            _run_ingestion(config_file, silent=silent)
 
     thread = threading.Thread(target=periodic_runner, daemon=True)
     thread.start()
-    print(
-        f"Started periodic ingestion thread (every {config.mcp.refresh_interval_hours}h)"
-    )
+    if not silent:
+        _log(
+            f"Started periodic ingestion thread (every {config.mcp.refresh_interval_hours}h)"
+        )
 
 
-def start(config_file: str = None):
+def start(
+    config_file: str = None,
+    transport: Optional[str] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    ingest_on_startup: Optional[bool] = None,
+):
     """Run the FastMCP server.
 
     Args:
         config_file: Path to the configuration file (default: TERRAFORM_INGEST_CONFIG env var or "config.yaml")
+        transport: Transport mode (stdio, http-streamable, sse) - overrides config
+        host: Host to bind to (for http-streamable and sse) - overrides config
+        port: Port to bind to (for http-streamable and sse) - overrides config
+        ingest_on_startup: Run ingestion on startup - overrides config
     """
     # Check for MCP configuration and auto-ingestion
     if config_file is None:
@@ -503,25 +567,52 @@ def start(config_file: str = None):
     # Update MCP instructions from configuration
     _update_mcp_instructions(config)
 
-    if config and config.mcp:
-        mcp_config = config.mcp
-    else:
-        mcp_config = None
+    # Determine transport settings (CLI args override config)
+    mcp_config = config.mcp if config and config.mcp else None
+    transport_mode = (
+        transport if transport else (mcp_config.transport if mcp_config else "stdio")
+    )
+    stdio_mode = transport_mode == "stdio"
 
-    print(f"MCP Configuration File: {config_file}")
-    print(f"MCP Config: {mcp_config}")
+    # Initialize the TerraformIngest instance and set MCP context
+    ingester = TerraformIngest.from_yaml(config_file)
+    vector_db_enabled = (config and config.embedding and config.embedding.enabled) or (
+        ingester.vector_db is not None
+    )
+    set_mcp_context(ingester, config, vector_db_enabled, stdio_mode=stdio_mode)
+
+    bind_host = host if host else (mcp_config.host if mcp_config else "127.0.0.1")
+    bind_port = port if port else (mcp_config.port if mcp_config else 3000)
+
+    if transport_mode != "stdio":
+        _log(f"Transport: {transport_mode}")
+        _log(f"Listening on {bind_host}:{bind_port}")
+
+    # Determine ingest_on_startup setting (CLI args override config)
+    should_ingest_on_startup = (
+        ingest_on_startup
+        if ingest_on_startup is not None
+        else (mcp_config.ingest_on_startup if mcp_config else False)
+    )
 
     # Run ingestion on startup if enabled
-    if mcp_config and mcp_config.ingest_on_startup:
-        print("MCP auto-ingestion enabled, running initial ingestion...")
-        _run_ingestion(config_file)
+    if should_ingest_on_startup:
+        _log("Running ingestion on startup...")
+        _run_ingestion(config_file, silent=stdio_mode)
 
     # Start periodic ingestion if configured
     if mcp_config and mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
-        _start_periodic_ingestion(config, config_file)
+        _start_periodic_ingestion(config, config_file, silent=stdio_mode)
 
-    print("Starting FastMCP server...")
-    mcp.run()
+    # Run with appropriate transport
+    if transport_mode == "stdio":
+        mcp.run()
+    elif transport_mode == "http-streamable":
+        mcp.run(transport="http-streamable", bind_address=(bind_host, bind_port))
+    elif transport_mode == "sse":
+        mcp.run(transport="sse", bind_address=(bind_host, bind_port))
+    else:
+        raise ValueError(f"Unknown transport mode: {transport_mode}")
 
 
 def main():
@@ -533,22 +624,44 @@ def main():
     # Update MCP instructions from configuration
     _update_mcp_instructions(config)
 
-    if config and config.mcp:
-        mcp_config = config.mcp
+    # Initialize the TerraformIngest instance and set MCP context
+    ingester = TerraformIngest.from_yaml(config_file)
+    vector_db_enabled = (config and config.embedding and config.embedding.enabled) or (
+        ingester.vector_db is not None
+    )
 
+    # Determine transport from config or defaults
+    mcp_config = config.mcp if config and config.mcp else None
+    transport_mode = mcp_config.transport if mcp_config else "stdio"
+    stdio_mode = transport_mode == "stdio"
+
+    set_mcp_context(ingester, config, vector_db_enabled, stdio_mode=stdio_mode)
+
+    bind_host = mcp_config.host if mcp_config else "127.0.0.1"
+    bind_port = mcp_config.port if mcp_config else 3000
+
+    if mcp_config:
         # Run ingestion on startup if enabled
         if mcp_config.ingest_on_startup:
-            print("MCP auto-ingestion enabled, running initial ingestion...")
-            _run_ingestion(config_file)
+            _log("MCP auto-ingestion enabled, running initial ingestion...")
+            _run_ingestion(config_file, silent=stdio_mode)
 
         # Start periodic ingestion if configured
         if mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
-            _start_periodic_ingestion(config, config_file)
-    else:
-        print("No MCP configuration found or auto-ingestion disabled")
+            _start_periodic_ingestion(config, config_file, silent=stdio_mode)
 
-    print("Starting FastMCP server...")
-    mcp.run()
+    if transport_mode != "stdio":
+        _log(f"Listening on {bind_host}:{bind_port}")
+
+    # Run with appropriate transport
+    if transport_mode == "stdio":
+        mcp.run()
+    elif transport_mode == "http-streamable":
+        mcp.run(transport="http-streamable", bind_address=(bind_host, bind_port))
+    elif transport_mode == "sse":
+        mcp.run(transport="sse", bind_address=(bind_host, bind_port))
+    else:
+        raise ValueError(f"Unknown transport mode: {transport_mode}")
 
 
 if __name__ == "__main__":
