@@ -192,3 +192,57 @@ output "id" {
         assert len(summary.variables) == 1
         assert len(summary.outputs) == 1
         assert len(summary.providers) >= 1
+
+
+def test_parse_resources():
+    """Test parsing resources from Terraform files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Create a sample main.tf with resources
+        main_tf = Path.joinpath(Path(tmpdir), "main.tf")
+        main_tf.write_text(
+            """
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+
+resource "aws_subnet" "public" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-1a"
+}
+
+resource "aws_subnet" "private" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-east-1b"
+}
+"""
+        )
+
+        parser = TerraformParser(tmpdir)
+        resources = parser._parse_resources()
+
+        assert len(resources) == 3
+        assert any(r.type == "aws_vpc" and r.name == "main" for r in resources)
+        assert any(r.type == "aws_subnet" and r.name == "public" for r in resources)
+        assert any(r.type == "aws_subnet" and r.name == "private" for r in resources)
+
+
+def test_parse_module_includes_resources():
+    """Test that parse_module includes resources in the summary."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Create sample files
+        (Path(tmpdir) / "main.tf").write_text(
+            """
+resource "aws_security_group" "allow_ssh" {
+  name = "allow_ssh"
+}
+"""
+        )
+
+        parser = TerraformParser(tmpdir)
+        summary = parser.parse_module("https://github.com/test/repo", "v1.0.0")
+
+        assert len(summary.resources) == 1
+        assert summary.resources[0].type == "aws_security_group"
+        assert summary.resources[0].name == "allow_ssh"

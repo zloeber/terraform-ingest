@@ -219,6 +219,196 @@ class ModuleQueryService:
             name = name[:-4]
         return name
 
+    def list_modules(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """List all ingested Terraform modules with their basic information.
+
+        Args:
+            limit: Maximum number of modules to return (default: 100)
+
+        Returns:
+            List of module metadata including repository, ref, path, and resource count
+        """
+        summaries = self._load_all_summaries()
+        result = []
+
+        for summary in summaries:
+            module_info = {
+                "repository": summary.get("repository", ""),
+                "ref": summary.get("ref", ""),
+                "path": summary.get("path", "."),
+                "description": summary.get("description", ""),
+                "resource_count": len(summary.get("resources", [])),
+                "variable_count": len(summary.get("variables", [])),
+                "output_count": len(summary.get("outputs", [])),
+                "provider_count": len(summary.get("providers", [])),
+                "module_count": len(summary.get("modules", [])),
+            }
+            result.append(module_info)
+
+        return result[:limit]
+
+    def list_module_resources(
+        self, repository: str, ref: str, path: str = "."
+    ) -> List[Dict[str, Any]]:
+        """List all resources for a specific Terraform module.
+
+        Args:
+            repository: Git repository URL
+            ref: Branch or tag name
+            path: Path within the repository (default: "." for root)
+
+        Returns:
+            List of resources with type and name
+        """
+        module = self.get_module(repository, ref, path)
+        if not module:
+            return []
+
+        resources = module.get("resources", [])
+        return [
+            {"type": r.get("type", ""), "name": r.get("name", "")} for r in resources
+        ]
+
+    @staticmethod
+    def _generate_module_uri(repository: str, ref: str, path: str = ".") -> str:
+        """Generate a URI for a module resource.
+
+        Args:
+            repository: Git repository URL
+            ref: Branch or tag name
+            path: Path within the repository
+
+        Returns:
+            URI string for the module resource
+        """
+        # Encode path separators for use in URI
+        safe_path = path.replace("/", "-").replace(".", "-")
+        safe_ref = ref.replace("/", "-").replace(".", "-")
+        safe_repo = (
+            repository.rstrip("/").split("/")[-1].replace(".git", "").replace("/", "-")
+        )
+
+        return f"module://{safe_repo}/{safe_ref}/{safe_path}".rstrip("/")
+
+    def get_module_document(self, repository: str, ref: str, path: str = ".") -> str:
+        """Get full module documentation as formatted text.
+
+        Args:
+            repository: Git repository URL
+            ref: Branch or tag name
+            path: Path within the repository (default: "." for root)
+
+        Returns:
+            Formatted module documentation string
+        """
+        module = self.get_module(repository, ref, path)
+        if not module:
+            return f"Module not found: {repository} @ {ref} ({path})"
+
+        lines = []
+
+        # Header
+        lines.append(f"# Terraform Module: {self._extract_repo_name(repository)}")
+        lines.append(f"\n**Repository:** {repository}")
+        lines.append(f"**Ref:** {ref}")
+        lines.append(f"**Path:** {path}\n")
+
+        # Description
+        if module.get("description"):
+            lines.append(f"## Description\n{module.get('description')}\n")
+
+        # Resources
+        resources = module.get("resources", [])
+        if resources:
+            lines.append("## Resources\n")
+            for resource in resources:
+                lines.append(f"- **{resource.get('type')}** - `{resource.get('name')}`")
+            lines.append("")
+
+        # Providers
+        providers = module.get("providers", [])
+        if providers:
+            lines.append("## Providers\n")
+            for provider in providers:
+                version_info = ""
+                if provider.get("version"):
+                    version_info = f" (v{provider.get('version')})"
+                lines.append(
+                    f"- **{provider.get('name')}**: {provider.get('source', 'N/A')}{version_info}"
+                )
+            lines.append("")
+
+        # Variables
+        variables = module.get("variables", [])
+        if variables:
+            lines.append("## Input Variables\n")
+            for var in variables:
+                required_str = "**Required**" if var.get("required") else "Optional"
+                lines.append(f"### {var.get('name')} ({required_str})")
+                lines.append(f"Type: `{var.get('type', 'N/A')}`")
+                if var.get("description"):
+                    lines.append(f"Description: {var.get('description')}")
+                if var.get("default") is not None:
+                    lines.append(f"Default: `{var.get('default')}`")
+                lines.append("")
+
+        # Outputs
+        outputs = module.get("outputs", [])
+        if outputs:
+            lines.append("## Outputs\n")
+            for output in outputs:
+                lines.append(f"### {output.get('name')}")
+                if output.get("description"):
+                    lines.append(f"Description: {output.get('description')}")
+                if output.get("sensitive"):
+                    lines.append("Sensitive: Yes")
+                lines.append("")
+
+        # Modules
+        modules = module.get("modules", [])
+        if modules:
+            lines.append("## Child Modules\n")
+            for mod in modules:
+                lines.append(f"- **{mod.get('name')}**: {mod.get('source')}")
+                if mod.get("version"):
+                    lines.append(f"  Version: {mod.get('version')}")
+            lines.append("")
+
+        # README
+        if module.get("readme_content"):
+            lines.append("## README\n")
+            lines.append(module.get("readme_content"))
+
+        return "\n".join(lines)
+
+    def list_module_resource_uris(self) -> List[Dict[str, Any]]:
+        """List all module resources with their URIs.
+
+        Returns:
+            List of dicts with module info and URI
+        """
+        summaries = self._load_all_summaries()
+        result = []
+
+        for summary in summaries:
+            uri = self._generate_module_uri(
+                summary.get("repository", ""),
+                summary.get("ref", ""),
+                summary.get("path", "."),
+            )
+            result.append(
+                {
+                    "uri": uri,
+                    "repository": summary.get("repository", ""),
+                    "ref": summary.get("ref", ""),
+                    "path": summary.get("path", "."),
+                    "name": f"{self._extract_repo_name(summary.get('repository', ''))} - {summary.get('ref')}",
+                    "description": summary.get("description", ""),
+                }
+            )
+
+        return result
+
 
 # Global service instance
 _service: Optional[ModuleQueryService] = None
@@ -269,7 +459,9 @@ def set_mcp_context(
             _log("Vector database enabled - search_modules_vector tool registered")
         except Exception as e:
             # Tool might already be registered, which is fine
-            _log(f"Vector database enabled - search_modules_vector tool (already registered or skipped: {e})")
+            _log(
+                f"Vector database enabled - search_modules_vector tool (already registered or skipped: {e})"
+            )
     else:
         _log("Vector database disabled - search_modules_vector tool not registered")
 
@@ -386,6 +578,66 @@ def get_module_details(
 
 
 @mcp.tool()
+def list_modules(
+    limit: int = 100, output_dir: str = "./output"
+) -> List[Dict[str, Any]]:
+    """Lists all ingested Terraform modules with their metadata.
+
+    This tool provides an overview of all available modules including their
+    location, the number of resources, variables, outputs, providers, and
+    sub-modules they contain. Useful for discovering what modules are available.
+
+    Args:
+        limit: Maximum number of modules to return (default: 100, max: 500)
+        output_dir: Directory containing ingested JSON summaries (default: ./output)
+
+    Returns:
+        List of module metadata including:
+        - repository: Git repository URL
+        - ref: Branch or tag name
+        - path: Path within repository
+        - description: Module description
+        - resource_count: Number of resources defined
+        - variable_count: Number of input variables
+        - output_count: Number of outputs
+        - provider_count: Number of required providers
+        - module_count: Number of sub-modules
+    """
+    service = get_service(output_dir)
+    # Cap limit at 500
+    limit = min(limit, 500)
+    return service.list_modules(limit=limit)
+
+
+@mcp.tool()
+def list_module_resources(
+    repository: str,
+    ref: str,
+    path: str = ".",
+    output_dir: str = "./output",
+) -> List[Dict[str, Any]]:
+    """Lists all Terraform resources defined in a specific module.
+
+    This tool shows all the AWS, Azure, GCP, and other resources that a
+    Terraform module creates or manages. Each resource is identified by its
+    type (e.g., aws_vpc, aws_security_group) and name.
+
+    Args:
+        repository: Git repository URL (e.g., "https://github.com/terraform-aws-modules/terraform-aws-vpc")
+        ref: Branch or tag name (e.g., "main", "v5.0.0")
+        path: Path within the repository where the module is located (default: "." for root)
+        output_dir: Directory containing ingested JSON summaries (default: ./output)
+
+    Returns:
+        List of resources with:
+        - type: Resource type (e.g., "aws_vpc", "aws_security_group")
+        - name: Resource name as defined in the module
+    """
+    service = get_service(output_dir)
+    return service.list_module_resources(repository=repository, ref=ref, path=path)
+
+
+@mcp.tool()
 def search_modules_vector(
     query: str,
     provider: Optional[str] = None,
@@ -441,6 +693,81 @@ def search_modules_vector(
         return [{"error": str(e), "message": "Failed to search vector database"}]
 
 
+@mcp.tool()
+def list_module_resource_uris(output_dir: str = "./output") -> List[Dict[str, Any]]:
+    """Lists all ingested modules with their MCP resource URIs.
+
+    This tool provides a mapping of all available modules to their resource URIs,
+    which can be used to access full module documentation as MCP resources.
+    Each module is assigned a unique URI that can be read to get complete module
+    information including variables, outputs, providers, resources, and README.
+
+    Args:
+        output_dir: Directory containing ingested JSON summaries (default: ./output)
+
+    Returns:
+        List of modules with:
+        - uri: MCP resource URI for the module (e.g., "module://terraform-aws-vpc/v5.0.0")
+        - repository: Git repository URL
+        - ref: Branch or tag name
+        - path: Path within repository
+        - name: Friendly name for the module
+        - description: Short description of the module
+    """
+    service = get_service(output_dir)
+    return service.list_module_resource_uris()
+
+
+# Resource endpoints for full module documentation
+
+
+@mcp.resource("module://{repository}/{ref}/{path}")
+def get_module_resource(repository: str, ref: str, path: str = "-") -> str:
+    """Get full Terraform module documentation as a resource.
+
+    This resource provides comprehensive module information including description,
+    all resources it creates, providers required, input variables with descriptions,
+    outputs, child modules, and the full README content.
+
+    The path parameter uses hyphens instead of slashes in the URI (e.g., "-" for ".",
+    "modules-aws" for "modules/aws"). Use list_module_resource_uris to get valid URIs.
+
+    Args:
+        repository: Module repository name from the resource URI
+        ref: Module ref (branch/tag) from the resource URI
+        path: Module path from the resource URI (hyphens will be converted to slashes)
+
+    Returns:
+        Full module documentation as formatted text
+    """
+    service = get_service()
+
+    # Decode path: hyphens back to slashes
+    decoded_path = path.replace("-", "/")
+    if decoded_path == "/":
+        decoded_path = "."
+
+    # Try to reconstruct the repository URL
+    # The repository name in the URI is just the basename, so we need to search for matching modules
+    summaries = service._load_all_summaries()
+    for summary in summaries:
+        summary_ref = summary.get("ref")
+        summary_path = summary.get("path", ".")
+        summary_repo = summary.get("repository", "")
+
+        # Check if this summary matches our criteria
+        ref_matches = summary_ref == ref
+        path_matches = (decoded_path == "." and summary_path == ".") or (
+            decoded_path != "." and decoded_path in summary_path
+        )
+        repo_matches = repository in summary_repo
+
+        if ref_matches and path_matches and repo_matches:
+            return service.get_module_document(summary_repo, ref, summary_path)
+
+    return f"Module not found: {repository} @ {ref} ({decoded_path})"
+
+
 # Testable wrapper functions (not decorated with @mcp.tool())
 def _list_repositories_impl(
     filter: Optional[str] = None, limit: int = 50, output_dir: str = "./output"
@@ -471,6 +798,63 @@ def _get_module_details_impl(
     """Implementation of get_module_details for testing."""
     service = ModuleQueryService(output_dir)
     return service.get_module(repository=repository, ref=ref, path=path)
+
+
+def _list_modules_impl(
+    limit: int = 100, output_dir: str = "./output"
+) -> List[Dict[str, Any]]:
+    """Implementation of list_modules for testing."""
+    service = ModuleQueryService(output_dir)
+    limit = min(limit, 500)
+    return service.list_modules(limit=limit)
+
+
+def _list_module_resources_impl(
+    repository: str,
+    ref: str,
+    path: str = ".",
+    output_dir: str = "./output",
+) -> List[Dict[str, Any]]:
+    """Implementation of list_module_resources for testing."""
+    service = ModuleQueryService(output_dir)
+    return service.list_module_resources(repository=repository, ref=ref, path=path)
+
+
+def _list_module_resource_uris_impl(
+    output_dir: str = "./output",
+) -> List[Dict[str, Any]]:
+    """Implementation of list_module_resource_uris for testing."""
+    service = ModuleQueryService(output_dir)
+    return service.list_module_resource_uris()
+
+
+def _get_module_resource_impl(repository: str, ref: str, path: str = "-") -> str:
+    """Implementation of get_module_resource for testing."""
+    service = get_service()
+
+    # Decode path: hyphens back to slashes
+    decoded_path = path.replace("-", "/")
+    if decoded_path == "/":
+        decoded_path = "."
+
+    # Try to reconstruct the repository URL
+    # The repository name in the URI is just the basename, so we need to search for matching modules
+    summaries = service._load_all_summaries()
+    for summary in summaries:
+        if (
+            summary.get("ref") == ref
+            and (
+                decoded_path == "."
+                and summary.get("path") == "."
+                or decoded_path in summary.get("path", "")
+            )
+            and repository in summary.get("repository", "")
+        ):
+            full_repo_url = summary.get("repository", "")
+            full_path = summary.get("path", ".")
+            return service.get_module_document(full_repo_url, ref, full_path)
+
+    return f"Module not found: {repository} @ {ref} ({decoded_path})"
 
 
 def _load_config_file(config_file: str = "config.yaml") -> Optional[IngestConfig]:

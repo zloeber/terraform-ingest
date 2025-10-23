@@ -39,6 +39,14 @@ class TerraformModule(BaseModel):
     version: Optional[str] = None
 
 
+class TerraformResource(BaseModel):
+    """Model for a Terraform resource."""
+
+    type: str
+    name: str
+    description: Optional[str] = None
+
+
 class TerraformModuleSummary(BaseModel):
     """Summary of a Terraform module."""
 
@@ -50,6 +58,7 @@ class TerraformModuleSummary(BaseModel):
     outputs: List[TerraformOutput] = Field(default_factory=list)
     providers: List[TerraformProvider] = Field(default_factory=list)
     modules: List[TerraformModule] = Field(default_factory=list)
+    resources: List[TerraformResource] = Field(default_factory=list)
     readme_content: Optional[str] = None
 
 
@@ -89,11 +98,12 @@ class McpConfig(BaseModel):
     1. ALWAYS prefer tagged release versions (e.g., v1.2.3, 1.2.3) over branch references
     2. When multiple versions exist, recommend the latest stable release
     3. Include warning comments above code blocks that use branch references instead of tags
+    4. If `search_modules_vector` tool is available, use it for searching modules first
 
     Search Strategy:
     - Search for modules matching the user's requirements
     - Filter results to prioritize tagged releases
-    - If only branch versions exist, explicitly mention this as a risk in a comment within the code you generate for the user
+    - If only branch versions exist, explicitly mention this as a risk in a comment within the code you generate
     """
     )
 

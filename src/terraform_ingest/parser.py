@@ -8,6 +8,7 @@ from .models import (
     TerraformOutput,
     TerraformProvider,
     TerraformModule,
+    TerraformResource,
     TerraformModuleSummary,
 )
 
@@ -27,6 +28,7 @@ class TerraformParser:
         outputs = self._parse_outputs()
         providers = self._parse_providers()
         modules = self._parse_modules()
+        resources = self._parse_resources()
         description = self._extract_description()
         readme_content = self._read_readme()
 
@@ -42,6 +44,7 @@ class TerraformParser:
             outputs=outputs,
             providers=providers,
             modules=modules,
+            resources=resources,
             readme_content=readme_content,
         )
 
@@ -232,6 +235,45 @@ class TerraformParser:
                 print(f"Error parsing modules from {tf_file}: {e}")
 
         return modules
+
+    def _parse_resources(self) -> List[TerraformResource]:
+        """Parse resource declarations from terraform configuration files."""
+        resources = []
+        tf_files = list(self.module_path.glob("*.tf"))
+
+        for tf_file in tf_files:
+            try:
+                with open(tf_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    parsed = hcl2.loads(content)
+
+                    if "resource" in parsed:
+                        for resource_list in parsed["resource"]:
+                            for (
+                                resource_type,
+                                resource_instances,
+                            ) in resource_list.items():
+                                # resource_instances is a dict where keys are resource names
+                                # and values are the resource configurations
+                                if isinstance(resource_instances, dict):
+                                    for resource_name in resource_instances.keys():
+                                        # Avoid duplicates
+                                        if not any(
+                                            r.type == resource_type
+                                            and r.name == resource_name
+                                            for r in resources
+                                        ):
+                                            resources.append(
+                                                TerraformResource(
+                                                    type=resource_type,
+                                                    name=resource_name,
+                                                    description=None,
+                                                )
+                                            )
+            except Exception as e:
+                print(f"Error parsing resources from {tf_file}: {e}")
+
+        return resources
 
     def _extract_description(self) -> Optional[str]:
         """Extract module description from comments or README."""
