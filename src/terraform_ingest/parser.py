@@ -236,7 +236,7 @@ class TerraformParser:
     def _extract_description(self) -> Optional[str]:
         """Extract module description from comments or README."""
         # Try to find description in main.tf comments
-        main_tf = self.module_path / "main.tf"
+        main_tf = Path.joinpath(self.module_path, "main.tf")
         if main_tf.exists():
             try:
                 with open(main_tf, "r", encoding="utf-8") as f:
@@ -279,7 +279,7 @@ class TerraformParser:
         """Read README file if it exists."""
         readme_files = ["README.md", "README.txt", "README", "readme.md"]
         for readme_name in readme_files:
-            readme_path = self.module_path / readme_name
+            readme_path = Path.joinpath(self.module_path, readme_name)
             if readme_path.exists():
                 try:
                     with open(readme_path, "r", encoding="utf-8") as f:

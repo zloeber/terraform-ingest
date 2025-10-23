@@ -63,6 +63,10 @@ class RepositoryConfig(BaseModel):
     max_tags: Optional[int] = 10
     path: str = "."
     recursive: bool = False
+    exclude_paths: List[str] = Field(
+        default_factory=list,
+        description="List of glob patterns to exclude from ingestion (e.g., 'examples/*', 'test/*')",
+    )
 
 
 class McpConfig(BaseModel):
@@ -72,7 +76,19 @@ class McpConfig(BaseModel):
     ingest_on_startup: bool = False
     refresh_interval_hours: Optional[int] = None
     instructions: str = (
-        "Service for querying ingested Terraform modules from Git repositories."
+        """
+    You are a Terraform module assistant that helps users find and use infrastructure modules.
+
+    CRITICAL RULES:
+    1. ALWAYS prefer tagged release versions (e.g., v1.2.3, 1.2.3) over branch references
+    2. When multiple versions exist, recommend the latest stable release
+    3. Include warning comments above code blocks that use branch references instead of tags
+
+    Search Strategy:
+    - Search for modules matching the user's requirements
+    - Filter results to prioritize tagged releases
+    - If only branch versions exist, explicitly mention this as a risk in a comment within the code you generate for the user
+    """
     )
 
 

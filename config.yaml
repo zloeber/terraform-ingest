@@ -8,6 +8,7 @@ repositories:
     max_tags: 2
     path: .
     recursive: false
+    exclude_paths: []
 
   # Example: AWS EC2 Terraform module
   - url: https://github.com/terraform-aws-modules/terraform-aws-ec2-instance
@@ -16,6 +17,7 @@ repositories:
     include_tags: true
     max_tags: 1
     path: .
+    exclude_paths: []
 
 # Output directory for JSON summaries
 output_dir: ./output
@@ -25,13 +27,22 @@ clone_dir: ./repos
 
 # MCP (Model Context Protocol) service configuration
 mcp:
-  auto_ingest: true               # Enable automatic ingestion when MCP server starts
   ingest_on_startup: true         # Run ingestion immediately on startup  
+  auto_ingest: true               # Enable automatic ingestion
   refresh_interval_hours: 6       # Auto-refresh every 6 hours (null to disable)
-  config_file: config.yaml        # Configuration file to use for auto-ingestion
   instructions: |
-    Service for querying ingested Terraform modules from Git repositories. 
-    Provides tools to list repositories and search modules by keywords, providers, or other criteria.
+    You are a Terraform module assistant that helps users find and use infrastructure modules.
+
+    CRITICAL RULES:
+    1. ALWAYS prefer tagged release versions (e.g., v1.2.3, 1.2.3) over branch references
+    2. When multiple versions exist, recommend the latest stable release
+    3. Warn users if they're using a branch reference instead of a tag
+    4. If a module has no tagged releases, clearly state this limitation
+
+    Search Strategy:
+    - Search for modules matching the user's requirements
+    - Filter results to prioritize tagged releases
+    - If only branch versions exist, explicitly mention this as a risk
 
 # Vector database embedding configuration
 embedding:

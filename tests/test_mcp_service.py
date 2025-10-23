@@ -108,7 +108,7 @@ def sample_output_dir():
 
         # Write summaries to files
         for i, summary in enumerate(summaries):
-            filename = output_dir / f"module_{i}.json"
+            filename = Path.joinpath(output_dir, f"module_{i}.json")
             with open(filename, "w", encoding="utf-8") as f:
                 json.dump(summary, f, indent=2)
 
@@ -307,40 +307,6 @@ def test_mcp_search_modules_tool(sample_output_dir):
     assert len(combined_results) == 2
 
 
-def test_mcp_tools_with_empty_directory():
-    """Test MCP tools with empty output directory."""
-    from terraform_ingest.mcp_service import (
-        _list_repositories_impl,
-        _search_modules_impl,
-    )
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Test list_repositories with empty directory
-        repos = _list_repositories_impl(output_dir=tmpdir)
-        assert len(repos) == 0
-
-        # Test search_modules with empty directory
-        results = _search_modules_impl(query="test", output_dir=tmpdir)
-        assert len(results) == 0
-
-
-def test_mcp_tools_with_nonexistent_directory():
-    """Test MCP tools with nonexistent output directory."""
-    from terraform_ingest.mcp_service import (
-        _list_repositories_impl,
-        _search_modules_impl,
-    )
-
-    nonexistent_dir = "/nonexistent/directory"
-
-    # Should handle gracefully and return empty results
-    repos = _list_repositories_impl(output_dir=nonexistent_dir)
-    assert len(repos) == 0
-
-    results = _search_modules_impl(query="test", output_dir=nonexistent_dir)
-    assert len(results) == 0
-
-
 def test_mcp_search_modules_edge_cases(sample_output_dir):
     """Test search_modules with edge cases."""
     from terraform_ingest.mcp_service import _search_modules_impl
@@ -381,6 +347,212 @@ def test_mcp_list_repositories_edge_cases(sample_output_dir):
     # Zero limit
     zero_repos = _list_repositories_impl(limit=0, output_dir=sample_output_dir)
     assert len(zero_repos) == 0
+
+
+def test_get_module_details_by_exact_match(sample_output_dir):
+    """Test retrieving module details by exact repository, ref, and path match."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # Get AWS VPC main branch module details
+    module = service.get_module(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="main",
+        path=".",
+    )
+
+    assert module is not None
+    assert (
+        module["repository"]
+        == "https://github.com/terraform-aws-modules/terraform-aws-vpc"
+    )
+    assert module["ref"] == "main"
+    assert module["path"] == "."
+    assert (
+        module["description"] == "Terraform module which creates VPC resources on AWS"
+    )
+    assert len(module["variables"]) == 1
+    assert module["variables"][0]["name"] == "vpc_cidr"
+    assert len(module["outputs"]) == 1
+    assert module["outputs"][0]["name"] == "vpc_id"
+    assert len(module["providers"]) == 1
+    assert module["providers"][0]["name"] == "aws"
+
+
+def test_get_module_details_by_version_tag(sample_output_dir):
+    """Test retrieving module details for a specific version tag."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # Get AWS VPC tagged version
+    module = service.get_module(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="v5.0.0",
+        path=".",
+    )
+
+    assert module is not None
+    assert module["ref"] == "v5.0.0"
+    assert (
+        module["description"] == "Terraform module which creates VPC resources on AWS"
+    )
+
+
+def test_get_module_details_not_found(sample_output_dir):
+    """Test retrieving module details for nonexistent module."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # Try to get a module that doesn't exist
+    module = service.get_module(
+        repository="https://github.com/nonexistent/repo",
+        ref="main",
+        path=".",
+    )
+
+    assert module is None
+
+
+def test_get_module_details_wrong_ref(sample_output_dir):
+    """Test retrieving module details with wrong ref."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # Try to get a module with wrong ref
+    module = service.get_module(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="nonexistent-ref",
+        path=".",
+    )
+
+    assert module is None
+
+
+def test_get_module_details_wrong_path(sample_output_dir):
+    """Test retrieving module details with wrong path."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # Try to get a module with wrong path
+    module = service.get_module(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="main",
+        path="nonexistent/path",
+    )
+
+    assert module is None
+
+
+def test_mcp_get_module_details_tool(sample_output_dir):
+    """Test the MCP get_module_details tool function."""
+    from terraform_ingest.mcp_service import _get_module_details_impl
+
+    # Test retrieving a module successfully
+    module = _get_module_details_impl(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="main",
+        path=".",
+        output_dir=sample_output_dir,
+    )
+
+    assert module is not None
+    assert (
+        module["repository"]
+        == "https://github.com/terraform-aws-modules/terraform-aws-vpc"
+    )
+    assert module["ref"] == "main"
+
+    # Verify complete structure
+    assert "path" in module
+    assert "description" in module
+    assert "variables" in module
+    assert "outputs" in module
+    assert "providers" in module
+    assert "modules" in module
+    assert "readme_content" in module
+
+
+def test_mcp_get_module_details_tool_not_found(sample_output_dir):
+    """Test the MCP get_module_details tool with nonexistent module."""
+    from terraform_ingest.mcp_service import _get_module_details_impl
+
+    # Test retrieving a module that doesn't exist
+    module = _get_module_details_impl(
+        repository="https://github.com/nonexistent/repo",
+        ref="main",
+        path=".",
+        output_dir=sample_output_dir,
+    )
+
+    assert module is None
+
+
+def test_mcp_get_module_details_tool_azure(sample_output_dir):
+    """Test the MCP get_module_details tool with Azure module."""
+    from terraform_ingest.mcp_service import _get_module_details_impl
+
+    # Test retrieving Azure network module
+    module = _get_module_details_impl(
+        repository="https://github.com/terraform-azure-modules/terraform-azurerm-network",
+        ref="main",
+        path=".",
+        output_dir=sample_output_dir,
+    )
+
+    assert module is not None
+    assert (
+        module["repository"]
+        == "https://github.com/terraform-azure-modules/terraform-azurerm-network"
+    )
+    assert module["ref"] == "main"
+    assert "azurerm" in str(module["providers"]).lower()
+    assert "address_space" in str(module["variables"])
+
+
+def test_mcp_tools_with_empty_directory():
+    """Test MCP tools with empty output directory."""
+    from terraform_ingest.mcp_service import (
+        _list_repositories_impl,
+        _search_modules_impl,
+        _get_module_details_impl,
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Test list_repositories with empty directory
+        repos = _list_repositories_impl(output_dir=tmpdir)
+        assert len(repos) == 0
+
+        # Test search_modules with empty directory
+        results = _search_modules_impl(query="test", output_dir=tmpdir)
+        assert len(results) == 0
+
+        # Test get_module_details with empty directory
+        module = _get_module_details_impl(
+            repository="https://github.com/example/repo",
+            ref="main",
+            output_dir=tmpdir,
+        )
+        assert module is None
+
+
+def test_mcp_tools_with_nonexistent_directory():
+    """Test MCP tools with nonexistent output directory."""
+    from terraform_ingest.mcp_service import (
+        _list_repositories_impl,
+        _search_modules_impl,
+        _get_module_details_impl,
+    )
+
+    nonexistent_dir = "/nonexistent/directory"
+
+    # Should handle gracefully and return empty/None results
+    repos = _list_repositories_impl(output_dir=nonexistent_dir)
+    assert len(repos) == 0
+
+    results = _search_modules_impl(query="test", output_dir=nonexistent_dir)
+    assert len(results) == 0
+
+    module = _get_module_details_impl(
+        repository="https://github.com/example/repo",
+        ref="main",
+        output_dir=nonexistent_dir,
+    )
+    assert module is None
 
 
 # MCP Auto-Ingestion Tests

@@ -16,7 +16,7 @@ def test_parse_variables():
     """Test parsing variables from variables.tf."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a sample variables.tf
-        variables_tf = Path(tmpdir) / "variables.tf"
+        variables_tf = Path.joinpath(Path(tmpdir), "variables.tf")
         variables_tf.write_text(
             """
 variable "vpc_cidr" {
@@ -46,7 +46,7 @@ def test_parse_outputs():
     """Test parsing outputs from outputs.tf."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a sample outputs.tf
-        outputs_tf = Path(tmpdir) / "outputs.tf"
+        outputs_tf = Path.joinpath(Path(tmpdir), "outputs.tf")
         outputs_tf.write_text(
             """
 output "vpc_id" {

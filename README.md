@@ -2,47 +2,6 @@
 
 A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file of terraform git repository sources, downloads them locally using existing credentials, creates JSON summaries of their purpose, inputs, outputs, and providers for branches or tagged releases you specify for ingestion via a RAG pipeline into a vector database. Includes an easy to use cli, API, or MCP server.
 
-<!---toc start-->
-
-* [terraform-ingest](#terraform-ingest)
-  * [Features](#features)
-  * [Installation](#installation)
-    * [Optional: Install with Vector Database Support](#optional-install-with-vector-database-support)
-  * [Usage](#usage)
-    * [CLI Interface](#cli-interface)
-      * [Initialize a Configuration File](#initialize-a-configuration-file)
-      * [Ingest Repositories from Configuration](#ingest-repositories-from-configuration)
-      * [Analyze a Single Repository](#analyze-a-single-repository)
-      * [Search with Vector Database](#search-with-vector-database)
-    * [MCP Service for AI Agents](#mcp-service-for-ai-agents)
-      * [Start the MCP Server](#start-the-mcp-server)
-      * [MCP Tools](#mcp-tools)
-      * [Example MCP Usage](#example-mcp-usage)
-      * [Configuring Output Directory](#configuring-output-directory)
-    * [API Service](#api-service)
-      * [Start the API Server](#start-the-api-server)
-      * [API Endpoints](#api-endpoints)
-      * [Example API Requests](#example-api-requests)
-  * [Configuration File Format](#configuration-file-format)
-    * [Configuration Options](#configuration-options)
-  * [Output Format](#output-format)
-  * [Use Cases](#use-cases)
-    * [RAG Pipeline Integration](#rag-pipeline-integration)
-    * [Example RAG Workflow](#example-rag-workflow)
-  * [Vector Database Embeddings](#vector-database-embeddings)
-    * [Quick Start](#quick-start)
-    * [Features](#features-1)
-    * [Embedding Strategies](#embedding-strategies)
-    * [Documentation](#documentation)
-    * [Example Queries](#example-queries)
-  * [Development](#development)
-    * [Running Tests](#running-tests)
-    * [Code Quality](#code-quality)
-  * [License](#license)
-  * [Contributing](#contributing)
-
-<!---toc end-->
-
 ## Features
 
 - 📥 **Multi-Repository Ingestion**: Process multiple Terraform repositories from a single YAML configuration
@@ -56,9 +15,21 @@ A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file o
 
 ## Installation
 
+This application can be run locally as a CLI, API service, or MCP server using uv or docker.
+
 ```bash
-uv sync
-source .venv/bin/activate
+# simple pip install
+pip install terraform-ingest
+
+## Or only with uv
+# Create a config
+uv run terraform-ingest init config.yaml
+
+# Update your config.yaml file to include your terraform module information and mcp config then preform the initial ingestion
+uv run terraform-ingest ingest
+
+# Run a quick cli search to test things out
+uv run terraform-ingest search "vpc module for aws"
 ```
 
 ### Optional: Install with Vector Database Support

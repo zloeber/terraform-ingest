@@ -11,6 +11,7 @@ repositories:
     max_tags: 2
     path: .
     recursive: false
+    exclude_paths: []
 
   # Example: AWS EC2 Terraform module
   - url: https://github.com/terraform-aws-modules/terraform-aws-ec2-instance
@@ -19,6 +20,9 @@ repositories:
     include_tags: true
     max_tags: 1
     path: .
+    exclude_paths:
+      - "examples/*"
+      - "test/*"
 
 # Output directory for JSON summaries
 output_dir: ./output

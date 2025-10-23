@@ -1,5 +1,6 @@
 """Repository management for cloning and analyzing terraform repositories."""
 
+import fnmatch
 import os
 import shutil
 from pathlib import Path
@@ -34,7 +35,7 @@ class RepositoryManager:
             if repo_name.endswith(".git"):
                 repo_name = repo_name[:-4]
 
-        repo_path = self.clone_dir / repo_name
+        repo_path = Path.joinpath(self.clone_dir, repo_name)
 
         # Clone or update repository
         repo = self._clone_or_update(repo_config.url, repo_path)
@@ -116,7 +117,7 @@ class RepositoryManager:
 
             # Find all module paths
             module_paths = self._find_module_paths(
-                repo_path, module_path, repo_config.recursive
+                repo_path, module_path, repo_config.recursive, repo_config.exclude_paths
             )
 
             for mod_path in module_paths:
@@ -136,13 +137,20 @@ class RepositoryManager:
             return []
 
     def _find_module_paths(
-        self, repo_path: Path, module_path: str, recursive: bool = False
+        self,
+        repo_path: Path,
+        module_path: str,
+        recursive: bool = False,
+        exclude_paths: Optional[List[str]] = None,
     ) -> List[Path]:
-        """Find all terraform module paths."""
-        full_module_path = repo_path / module_path
+        """Find all terraform module paths, excluding patterns in exclude_paths."""
+        full_module_path = Path.joinpath(repo_path, module_path)
         if not full_module_path.exists():
             print(f"Module path {module_path} does not exist")
             return []
+
+        if exclude_paths is None:
+            exclude_paths = []
 
         module_paths = []
 
@@ -150,6 +158,16 @@ class RepositoryManager:
             # Recursively find all directories containing terraform files
             for root, dirs, files in os.walk(full_module_path):
                 root_path = Path(root)
+                # Get relative path from repo root for exclusion matching
+                try:
+                    relative_path = root_path.relative_to(repo_path)
+                except ValueError:
+                    relative_path = root_path
+
+                # Check if path should be excluded
+                if self._is_path_excluded(str(relative_path), exclude_paths):
+                    continue
+
                 # Check if this directory contains terraform files
                 if self._is_terraform_module(root_path):
                     module_paths.append(root_path)
@@ -159,6 +177,32 @@ class RepositoryManager:
                 module_paths.append(full_module_path)
 
         return module_paths
+
+    def _is_path_excluded(
+        self, relative_path: str, exclude_patterns: List[str]
+    ) -> bool:
+        """Check if a path matches any of the exclude patterns."""
+        # Normalize path separators for cross-platform compatibility
+        normalized_path = relative_path.replace(os.sep, "/")
+
+        for pattern in exclude_patterns:
+            # Normalize pattern separators
+            normalized_pattern = pattern.replace(os.sep, "/")
+
+            # Check if the path matches the pattern (supporting both exact and wildcard matches)
+            if fnmatch.fnmatch(normalized_path, normalized_pattern):
+                return True
+            # Also check if any parent directory matches (for patterns like 'examples/*')
+            if fnmatch.fnmatch(normalized_path + "/", normalized_pattern):
+                return True
+            # Check if pattern matches any component of the path
+            parts = normalized_path.split("/")
+            for i in range(len(parts)):
+                partial_path = "/".join(parts[: i + 1])
+                if fnmatch.fnmatch(partial_path, normalized_pattern):
+                    return True
+
+        return False
 
     def _is_terraform_module(self, path: Path) -> bool:
         """Check if a directory contains terraform files."""

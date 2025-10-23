@@ -65,7 +65,7 @@ class TerraformIngest:
         else:
             filename = f"{repo_name}_{ref_name}.json"
 
-        output_path = self.output_dir / filename
+        output_path = Path.joinpath(self.output_dir, filename)
 
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(summary.model_dump(), f, indent=2, default=str)

@@ -183,6 +183,34 @@ class ModuleQueryService:
 
         return results
 
+    def get_module(
+        self,
+        repository: str,
+        ref: str,
+        path: str = ".",
+    ) -> Optional[Dict[str, Any]]:
+        """Retrieve full details for a specific Terraform module.
+
+        Args:
+            repository: Git repository URL
+            ref: Branch or tag name
+            path: Path within the repository (default: "." for root)
+
+        Returns:
+            Complete module summary dictionary, or None if not found
+        """
+        summaries = self._load_all_summaries()
+
+        for summary in summaries:
+            if (
+                summary.get("repository") == repository
+                and summary.get("ref") == ref
+                and summary.get("path") == path
+            ):
+                return summary
+
+        return None
+
     @staticmethod
     def _extract_repo_name(url: str) -> str:
         """Extract repository name from URL."""
@@ -272,6 +300,42 @@ def search_modules(
 
 
 @mcp.tool()
+def get_module_details(
+    repository: str,
+    ref: str,
+    path: str = ".",
+    output_dir: str = "./output",
+) -> Optional[Dict[str, Any]]:
+    """Retrieves full details for a specific ingested Terraform module.
+
+    This tool returns the complete module summary including all variables,
+    outputs, providers, sub-modules, and README content for a specific module
+    version. Useful when you know the exact module you want and need all its details.
+
+    Args:
+        repository: Git repository URL (e.g., "https://github.com/terraform-aws-modules/terraform-aws-vpc")
+        ref: Branch or tag name (e.g., "main", "v5.0.0")
+        path: Path within the repository where the module is located (default: "." for root)
+        output_dir: Directory containing ingested JSON summaries (default: ./output)
+
+    Returns:
+        Complete module summary dictionary including:
+        - repository: Git repository URL
+        - ref: Branch or tag name
+        - path: Path within repository
+        - description: Module description
+        - variables: List of input variables with type, default, and description
+        - outputs: List of outputs with description and sensitive flag
+        - providers: List of required Terraform providers with versions
+        - modules: List of sub-modules used
+        - readme_content: Full README file content
+        Or None if the module is not found.
+    """
+    service = get_service(output_dir)
+    return service.get_module(repository=repository, ref=ref, path=path)
+
+
+@mcp.tool()
 def search_modules_vector(
     query: str,
     provider: Optional[str] = None,
@@ -348,6 +412,17 @@ def _search_modules_impl(
     """Implementation of search_modules for testing."""
     service = ModuleQueryService(output_dir)
     return service.search_modules(query=query, repo_urls=repo_urls, provider=provider)
+
+
+def _get_module_details_impl(
+    repository: str,
+    ref: str,
+    path: str = ".",
+    output_dir: str = "./output",
+) -> Optional[Dict[str, Any]]:
+    """Implementation of get_module_details for testing."""
+    service = ModuleQueryService(output_dir)
+    return service.get_module(repository=repository, ref=ref, path=path)
 
 
 def _load_config_file(config_file: str = "config.yaml") -> Optional[IngestConfig]:
