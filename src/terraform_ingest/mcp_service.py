@@ -11,12 +11,80 @@ from fastmcp import FastMCP
 from terraform_ingest.models import IngestConfig
 from terraform_ingest.ingest import TerraformIngest
 
+from terraform_ingest.logging import get_mcp_logger
+
 # Initialize FastMCP server with default instructions
 # These will be updated when the config is loaded
 mcp = FastMCP(
     name="terraform-ingest",
     instructions="Service for querying ingested Terraform modules from Git repositories.",
 )
+
+# Create MCP logger with flushing capability
+mcp_logger = get_mcp_logger("my_mcp_service")
+
+# Flush logs immediately to avoid buffering issues
+mcp_logger.flush_logs()
+
+
+class MCPContext:
+    """Singleton context for MCP server configuration and state.
+
+    This class encapsulates all global state needed by the MCP server,
+    providing a clean API without polluting the global namespace with
+    individual variables.
+    """
+
+    _instance: Optional["MCPContext"] = None
+
+    def __init__(
+        self,
+        ingester: Optional[TerraformIngest] = None,
+        config: Optional[IngestConfig] = None,
+        vector_db_enabled: bool = False,
+        stdio_mode: bool = False,
+    ):
+        """Initialize the MCP context.
+
+        Args:
+            ingester: TerraformIngest instance for module operations
+            config: IngestConfig instance with server configuration
+            vector_db_enabled: Whether vector database functionality is enabled
+            stdio_mode: Whether running in stdio mode (for output suppression)
+        """
+        self.ingester = ingester
+        self.config = config
+        self.vector_db_enabled = vector_db_enabled
+        self.stdio_mode = stdio_mode
+
+    @classmethod
+    def get_instance(cls) -> "MCPContext":
+        """Get or create the singleton instance.
+
+        Returns:
+            MCPContext singleton instance
+        """
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def set(
+        cls,
+        ingester: TerraformIngest,
+        config: IngestConfig,
+        vector_db_enabled: bool,
+        stdio_mode: bool = False,
+    ) -> None:
+        """Set or reinitialize the context with new values.
+
+        Args:
+            ingester: TerraformIngest instance for module operations
+            config: IngestConfig instance with server configuration
+            vector_db_enabled: Whether vector database functionality is enabled
+            stdio_mode: Whether running in stdio mode
+        """
+        cls._instance = cls(ingester, config, vector_db_enabled, stdio_mode)
 
 
 class ModuleQueryService:
@@ -43,7 +111,7 @@ class ModuleQueryService:
                     summary = json.load(f)
                     summaries.append(summary)
             except Exception as e:
-                _log(f"Error loading {json_file}: {e}")
+                mcp_logger.error(f"Error loading {json_file}: {e}")
 
         return summaries
 
@@ -410,25 +478,8 @@ class ModuleQueryService:
         return result
 
 
-# Global service instance
+# Global service instance for lazy initialization
 _service: Optional[ModuleQueryService] = None
-
-# Global context for MCP server
-_ingester: Optional[TerraformIngest] = None
-_config: Optional[IngestConfig] = None
-_vector_db_enabled: bool = False
-_stdio_mode: bool = False  # Flag to suppress output in stdio mode
-
-
-def _log(message: str) -> None:
-    """Print message only if not in stdio mode.
-
-    Args:
-        message: Message to print
-    """
-    global _stdio_mode
-    if not _stdio_mode:
-        print(message)
 
 
 def set_mcp_context(
@@ -437,7 +488,9 @@ def set_mcp_context(
     vector_db_enabled: bool,
     stdio_mode: bool = False,
 ) -> None:
-    """Set the global MCP context with server configuration.
+    """Set the MCP context with server configuration.
+
+    This function delegates to MCPContext singleton for state management.
 
     Args:
         ingester: Configured TerraformIngest instance
@@ -445,25 +498,17 @@ def set_mcp_context(
         vector_db_enabled: Whether vector database is enabled
         stdio_mode: Whether running in stdio mode (suppresses output)
     """
-    global _ingester, _config, _vector_db_enabled, _stdio_mode
-    _ingester = ingester
-    _config = config
-    _vector_db_enabled = vector_db_enabled
-    _stdio_mode = stdio_mode
+    MCPContext.set(ingester, config, vector_db_enabled, stdio_mode)
 
-    # Conditionally register the search_modules_vector tool
+    # Log vector database status
     if vector_db_enabled:
-        # Register the tool if not already registered
-        try:
-            mcp.register_tool(search_modules_vector)
-            _log("Vector database enabled - search_modules_vector tool registered")
-        except Exception as e:
-            # Tool might already be registered, which is fine
-            _log(
-                f"Vector database enabled - search_modules_vector tool (already registered or skipped: {e})"
-            )
+        mcp_logger.info(
+            "Vector database enabled - search_modules_vector tool available"
+        )
     else:
-        _log("Vector database disabled - search_modules_vector tool not registered")
+        mcp_logger.info(
+            "Vector database disabled - search_modules_vector will return error"
+        )
 
 
 def get_service(output_dir: str = "./output") -> ModuleQueryService:
@@ -577,36 +622,36 @@ def get_module_details(
     return service.get_module(repository=repository, ref=ref, path=path)
 
 
-@mcp.tool()
-def list_modules(
-    limit: int = 100, output_dir: str = "./output"
-) -> List[Dict[str, Any]]:
-    """Lists all ingested Terraform modules with their metadata.
+# @mcp.tool()
+# def list_modules(
+#     limit: int = 100, output_dir: str = "./output"
+# ) -> List[Dict[str, Any]]:
+#     """Lists all ingested Terraform modules with their metadata.
 
-    This tool provides an overview of all available modules including their
-    location, the number of resources, variables, outputs, providers, and
-    sub-modules they contain. Useful for discovering what modules are available.
+#     This tool provides an overview of all available modules including their
+#     location, the number of resources, variables, outputs, providers, and
+#     sub-modules they contain. Useful for discovering what modules are available.
 
-    Args:
-        limit: Maximum number of modules to return (default: 100, max: 500)
-        output_dir: Directory containing ingested JSON summaries (default: ./output)
+#     Args:
+#         limit: Maximum number of modules to return (default: 100, max: 500)
+#         output_dir: Directory containing ingested JSON summaries (default: ./output)
 
-    Returns:
-        List of module metadata including:
-        - repository: Git repository URL
-        - ref: Branch or tag name
-        - path: Path within repository
-        - description: Module description
-        - resource_count: Number of resources defined
-        - variable_count: Number of input variables
-        - output_count: Number of outputs
-        - provider_count: Number of required providers
-        - module_count: Number of sub-modules
-    """
-    service = get_service(output_dir)
-    # Cap limit at 500
-    limit = min(limit, 500)
-    return service.list_modules(limit=limit)
+#     Returns:
+#         List of module metadata including:
+#         - repository: Git repository URL
+#         - ref: Branch or tag name
+#         - path: Path within repository
+#         - description: Module description
+#         - resource_count: Number of resources defined
+#         - variable_count: Number of input variables
+#         - output_count: Number of outputs
+#         - provider_count: Number of required providers
+#         - module_count: Number of sub-modules
+#     """
+#     service = get_service(output_dir)
+#     # Cap limit at 500
+#     limit = min(limit, 500)
+#     return service.list_modules(limit=limit)
 
 
 @mcp.tool()
@@ -663,11 +708,10 @@ def search_modules_vector(
         - document: Embedded text content
         - distance: Similarity score (lower is better)
     """
-    global _ingester
-
     try:
-        # Use the ingester from the running context
-        if not _ingester or not _ingester.vector_db:
+        # Get the ingester from the MCP context
+        ctx = MCPContext.get_instance()
+        if not ctx.ingester or not ctx.ingester.vector_db:
             return [
                 {
                     "error": "Vector database is not enabled",
@@ -683,7 +727,7 @@ def search_modules_vector(
             filters["repository"] = repository
 
         # Search
-        results = _ingester.search_vector_db(
+        results = ctx.ingester.search_vector_db(
             query, filters=filters if filters else None, n_results=limit
         )
 
@@ -693,29 +737,29 @@ def search_modules_vector(
         return [{"error": str(e), "message": "Failed to search vector database"}]
 
 
-@mcp.tool()
-def list_module_resource_uris(output_dir: str = "./output") -> List[Dict[str, Any]]:
-    """Lists all ingested modules with their MCP resource URIs.
+# @mcp.tool()
+# def list_module_resource_uris(output_dir: str = "./output") -> List[Dict[str, Any]]:
+#     """Lists all ingested modules with their MCP resource URIs.
 
-    This tool provides a mapping of all available modules to their resource URIs,
-    which can be used to access full module documentation as MCP resources.
-    Each module is assigned a unique URI that can be read to get complete module
-    information including variables, outputs, providers, resources, and README.
+#     This tool provides a mapping of all available modules to their resource URIs,
+#     which can be used to access full module documentation as MCP resources.
+#     Each module is assigned a unique URI that can be read to get complete module
+#     information including variables, outputs, providers, resources, and README.
 
-    Args:
-        output_dir: Directory containing ingested JSON summaries (default: ./output)
+#     Args:
+#         output_dir: Directory containing ingested JSON summaries (default: ./output)
 
-    Returns:
-        List of modules with:
-        - uri: MCP resource URI for the module (e.g., "module://terraform-aws-vpc/v5.0.0")
-        - repository: Git repository URL
-        - ref: Branch or tag name
-        - path: Path within repository
-        - name: Friendly name for the module
-        - description: Short description of the module
-    """
-    service = get_service(output_dir)
-    return service.list_module_resource_uris()
+#     Returns:
+#         List of modules with:
+#         - uri: MCP resource URI for the module (e.g., "module://terraform-aws-vpc/v5.0.0")
+#         - repository: Git repository URL
+#         - ref: Branch or tag name
+#         - path: Path within repository
+#         - name: Friendly name for the module
+#         - description: Short description of the module
+#     """
+#     service = get_service(output_dir)
+#     return service.list_module_resource_uris()
 
 
 # Resource endpoints for full module documentation
@@ -861,14 +905,16 @@ def _load_config_file(config_file: str = "config.yaml") -> Optional[IngestConfig
     """Load configuration file if it exists."""
     config_path = Path(config_file)
     if not config_path.exists():
-        _log(f"Config file {config_file} not found, skipping auto-ingestion")
+        mcp_logger.warning(
+            f"Config file {config_file} not found, skipping auto-ingestion"
+        )
         return None
 
     try:
         ingester = TerraformIngest.from_yaml(str(config_path))
         return ingester.config
     except Exception as e:
-        _log(f"Error loading config file {config_file}: {e}")
+        mcp_logger.error(f"Error loading config file {config_file}: {e}")
         return None
 
 
@@ -878,8 +924,6 @@ def _update_mcp_instructions(config: Optional[IngestConfig]):
     Args:
         config: Loaded IngestConfig, or None to use default instructions
     """
-    global mcp
-
     if config and config.mcp and config.mcp.instructions:
         mcp.instructions = config.mcp.instructions
     else:
@@ -888,22 +932,18 @@ def _update_mcp_instructions(config: Optional[IngestConfig]):
         )
 
 
-def _run_ingestion(config_file: str = "config.yaml", silent: bool = False):
+def _run_ingestion(config_file: str = "config.yaml"):
     """Run ingestion process from configuration file."""
     try:
-        if not silent:
-            _log(f"Starting auto-ingestion from {config_file}...")
-        ingester = TerraformIngest.from_yaml(config_file)
-        summaries = ingester.ingest(silent=silent)
-        if not silent:
-            _log(f"Auto-ingestion completed: {len(summaries)} modules processed")
+        mcp_logger.info(f"Starting auto-ingestion from {config_file}...")
+        ingester = TerraformIngest.from_yaml(config_file, logger=mcp_logger)
+        summaries = ingester.ingest()
+        mcp_logger.info(f"Auto-ingestion completed: {len(summaries)} modules processed")
     except Exception as e:
-        _log(f"Error during auto-ingestion: {e}")
+        mcp_logger.error(f"Error during auto-ingestion: {e}")
 
 
-def _start_periodic_ingestion(
-    config: IngestConfig, config_file: str, silent: bool = False
-):
+def _start_periodic_ingestion(config: IngestConfig, config_file: str):
     """Start periodic ingestion in a background thread."""
     if not config.mcp or not config.mcp.refresh_interval_hours:
         return
@@ -912,18 +952,16 @@ def _start_periodic_ingestion(
         interval_seconds = config.mcp.refresh_interval_hours * 3600
         while True:
             time.sleep(interval_seconds)
-            if not silent:
-                _log(
-                    f"Running scheduled ingestion (every {config.mcp.refresh_interval_hours}h)"
-                )
-            _run_ingestion(config_file, silent=silent)
+            mcp_logger.info(
+                f"Running scheduled ingestion (every {config.mcp.refresh_interval_hours}h)"
+            )
+            _run_ingestion(config_file)
 
     thread = threading.Thread(target=periodic_runner, daemon=True)
     thread.start()
-    if not silent:
-        _log(
-            f"Started periodic ingestion thread (every {config.mcp.refresh_interval_hours}h)"
-        )
+    mcp_logger.info(
+        f"Started periodic ingestion thread (every {config.mcp.refresh_interval_hours}h)"
+    )
 
 
 def start(
@@ -959,7 +997,7 @@ def start(
     stdio_mode = transport_mode == "stdio"
 
     # Initialize the TerraformIngest instance and set MCP context
-    ingester = TerraformIngest.from_yaml(config_file)
+    ingester = TerraformIngest.from_yaml(config_file, logger=mcp_logger)
     vector_db_enabled = (config and config.embedding and config.embedding.enabled) or (
         ingester.vector_db is not None
     )
@@ -967,10 +1005,10 @@ def start(
 
     bind_host = host if host else (mcp_config.host if mcp_config else "127.0.0.1")
     bind_port = port if port else (mcp_config.port if mcp_config else 3000)
+    mcp_logger.info(f"Transport: {transport_mode}")
 
     if transport_mode != "stdio":
-        _log(f"Transport: {transport_mode}")
-        _log(f"Listening on {bind_host}:{bind_port}")
+        mcp_logger.info(f"Listening on {bind_host}:{bind_port}")
 
     # Determine ingest_on_startup setting (CLI args override config)
     should_ingest_on_startup = (
@@ -981,12 +1019,12 @@ def start(
 
     # Run ingestion on startup if enabled
     if should_ingest_on_startup:
-        _log("Running ingestion on startup...")
-        _run_ingestion(config_file, silent=stdio_mode)
+        mcp_logger.info("Running ingestion on startup...")
+        _run_ingestion(config_file)
 
     # Start periodic ingestion if configured
     if mcp_config and mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
-        _start_periodic_ingestion(config, config_file, silent=stdio_mode)
+        _start_periodic_ingestion(config, config_file)
 
     # Run with appropriate transport
     if transport_mode == "stdio":
@@ -1009,7 +1047,7 @@ def main():
     _update_mcp_instructions(config)
 
     # Initialize the TerraformIngest instance and set MCP context
-    ingester = TerraformIngest.from_yaml(config_file)
+    ingester = TerraformIngest.from_yaml(config_file, logger=mcp_logger)
     vector_db_enabled = (config and config.embedding and config.embedding.enabled) or (
         ingester.vector_db is not None
     )
@@ -1027,15 +1065,15 @@ def main():
     if mcp_config:
         # Run ingestion on startup if enabled
         if mcp_config.ingest_on_startup:
-            _log("MCP auto-ingestion enabled, running initial ingestion...")
-            _run_ingestion(config_file, silent=stdio_mode)
+            mcp_logger.info("MCP auto-ingestion enabled, running initial ingestion...")
+            _run_ingestion(config_file)
 
         # Start periodic ingestion if configured
         if mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
-            _start_periodic_ingestion(config, config_file, silent=stdio_mode)
+            _start_periodic_ingestion(config, config_file)
 
     if transport_mode != "stdio":
-        _log(f"Listening on {bind_host}:{bind_port}")
+        mcp_logger.info(f"Listening on {bind_host}:{bind_port}")
 
     # Run with appropriate transport
     if transport_mode == "stdio":

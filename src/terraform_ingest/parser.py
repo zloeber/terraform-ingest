@@ -1,7 +1,7 @@
 """Terraform file parser for extracting module information."""
 
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 import hcl2
 from .models import (
     TerraformVariable,
@@ -11,14 +11,21 @@ from .models import (
     TerraformResource,
     TerraformModuleSummary,
 )
+from .logging import get_logger
 
 
 class TerraformParser:
     """Parser for Terraform configuration files."""
 
-    def __init__(self, module_path: str):
-        """Initialize the parser with a module path."""
+    def __init__(self, module_path: str, logger: Optional[Any] = None):
+        """Initialize the parser with a module path.
+
+        Args:
+            module_path: Path to the Terraform module
+            logger: Optional logger instance. Defaults to get_logger() if not provided.
+        """
         self.module_path = Path(module_path)
+        self.logger = logger or get_logger(__name__)
 
     def parse_module(
         self, repo_url: str, ref: str, relative_path: Optional[str] = None
@@ -90,7 +97,7 @@ class TerraformParser:
                                     )
                                 )
             except Exception as e:
-                print(f"Error parsing variables from {var_file}: {e}")
+                self.logger.error(f"Error parsing variables from {var_file}: {e}")
 
         return variables
 
@@ -135,7 +142,7 @@ class TerraformParser:
                                     )
                                 )
             except Exception as e:
-                print(f"Error parsing outputs from {output_file}: {e}")
+                self.logger.error(f"Error parsing outputs from {output_file}: {e}")
 
         return outputs
 
@@ -197,7 +204,7 @@ class TerraformParser:
                                     )
 
             except Exception as e:
-                print(f"Error parsing providers from {tf_file}: {e}")
+                self.logger.error(f"Error parsing providers from {tf_file}: {e}")
 
         return providers
 
@@ -232,7 +239,7 @@ class TerraformParser:
                                         )
                                     )
             except Exception as e:
-                print(f"Error parsing modules from {tf_file}: {e}")
+                self.logger.error(f"Error parsing modules from {tf_file}: {e}")
 
         return modules
 
@@ -271,7 +278,7 @@ class TerraformParser:
                                                 )
                                             )
             except Exception as e:
-                print(f"Error parsing resources from {tf_file}: {e}")
+                self.logger.error(f"Error parsing resources from {tf_file}: {e}")
 
         return resources
 

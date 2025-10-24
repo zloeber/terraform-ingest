@@ -21,6 +21,7 @@ A FastAPI/Click-based Python application that ingests multiple Terraform reposit
 - Use `click` for CLI commands and options
 - Use `pydantic` for data models and validation
 - All imports should be at the top of the file, grouped by standard library, third-party, and local imports
+- Never create global variables unless absolutely necessary, prefer passing parameters explicitly
 
 ## Architecture Components
 

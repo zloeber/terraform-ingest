@@ -2,20 +2,27 @@
 
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 import yaml
-from .models import IngestConfig, TerraformModuleSummary
-from .repository import RepositoryManager
-from .embeddings import VectorDBManager
+from terraform_ingest.models import IngestConfig, TerraformModuleSummary
+from terraform_ingest.repository import RepositoryManager
+from terraform_ingest.embeddings import VectorDBManager
+from terraform_ingest.logging import get_logger
 
 
 class TerraformIngest:
     """Main class for ingesting terraform repositories."""
 
-    def __init__(self, config: IngestConfig):
-        """Initialize the ingestion process."""
+    def __init__(self, config: IngestConfig, logger: Optional[Any] = None):
+        """Initialize the ingestion process.
+
+        Args:
+            config: IngestConfig instance with repository and embedding settings
+            logger: Optional logger instance. Defaults to get_logger() if not provided.
+        """
         self.config = config
-        self.repo_manager = RepositoryManager(config.clone_dir)
+        self.logger = logger or get_logger(__name__)
+        self.repo_manager = RepositoryManager(config.clone_dir, logger=self.logger)
         self.output_dir = Path(config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -25,32 +32,49 @@ class TerraformIngest:
             self.vector_db = VectorDBManager(config.embedding)
 
     @classmethod
-    def from_yaml(cls, yaml_path: str) -> "TerraformIngest":
-        """Create an instance from a YAML configuration file."""
+    def from_yaml(
+        cls, yaml_path: str, logger: Optional[Any] = None
+    ) -> "TerraformIngest":
+        """Create an instance from a YAML configuration file.
+
+        Args:
+            yaml_path: Path to the YAML configuration file
+            logger: Optional logger instance
+
+        Returns:
+            TerraformIngest instance
+        """
         with open(yaml_path, "r", encoding="utf-8") as f:
             config_dict = yaml.safe_load(f)
 
         config = IngestConfig(**config_dict)
-        return cls(config)
+        return cls(config, logger=logger)
 
-    def ingest(self, silent: bool = False) -> List[TerraformModuleSummary]:
-        """Process all repositories and generate summaries."""
+    def ingest(self) -> List[TerraformModuleSummary]:
+        """Process all repositories and generate summaries.
+
+        Returns:
+            List of TerraformModuleSummary instances for all processed modules
+        """
         all_summaries = []
 
         for repo_config in self.config.repositories:
-            if not silent:
-                print(f"Processing repository: {repo_config.url}")
-            summaries = self.repo_manager.process_repository(repo_config, silent=silent)
+            self.logger.info(f"Processing repository: {repo_config.url}")
+            summaries = self.repo_manager.process_repository(repo_config)
             all_summaries.extend(summaries)
 
             # Save summaries for this repository
             for summary in summaries:
-                self._save_summary(summary, silent=silent)
+                self._save_summary(summary)
 
         return all_summaries
 
-    def _save_summary(self, summary: TerraformModuleSummary, silent: bool = False):
-        """Save a summary to a JSON file."""
+    def _save_summary(self, summary: TerraformModuleSummary):
+        """Save a summary to a JSON file.
+
+        Args:
+            summary: TerraformModuleSummary instance to save
+        """
         # Create a safe filename from repository, ref, and path
         repo_name = summary.repository.rstrip("/").split("/")[-1]
         if repo_name.endswith(".git"):
@@ -70,18 +94,15 @@ class TerraformIngest:
 
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(summary.model_dump(), f, indent=2, default=str)
-        if not silent:
-            print(f"Saved summary to {output_path}")
+        self.logger.info(f"Saved summary to {output_path}")
 
         # Upsert to vector database if enabled
         if self.vector_db:
             try:
                 doc_id = self.vector_db.upsert_module(summary)
-                if not silent:
-                    print(f"Upserted to vector database with ID: {doc_id}")
+                self.logger.info(f"Upserted to vector database with ID: {doc_id}")
             except Exception as e:
-                if not silent:
-                    print(f"Warning: Failed to upsert to vector database: {e}")
+                self.logger.warning(f"Failed to upsert to vector database: {e}")
 
     def get_all_summaries_json(self) -> str:
         """Get all summaries as a single JSON string."""
