@@ -153,70 +153,38 @@ terraform-ingest search "security group" --repository https://github.com/terrafo
 
 See [Vector Database Embeddings](docs/vector_database_embeddings_FEATURE.md) for configuration and advanced usage.
 
-### MCP Service for AI Agents
+## MCP
 
 The FastMCP service exposes ingested Terraform modules to AI agents through the Model Context Protocol (MCP). This allows AI assistants to query and discover Terraform modules from your ingested repositories.
 
-#### Start the MCP Server
+### Start the MCP Server
 
 ```bash
 terraform-ingest-mcp
+
+# Or via streamable-http and a custom configuration file
+uv run terraform-ingest mcp -c config.client.yaml --transport streamable-http
+
+# Or via sse
+uv run terraform-ingest mcp --transport sse
 ```
 
-The server will start and expose two tools:
+### MCP Client Configuration
 
-1. **list_repositories**: Lists all accessible Git repositories containing Terraform modules
-2. **search_modules**: Searches for Terraform modules by name, provider, or keywords
+VSCode:
 
-#### MCP Tools
-
-**list_repositories**
-```python
-# Lists all repositories with metadata
-list_repositories(
-    filter="aws",           # Optional: filter by keyword
-    limit=50,               # Optional: max results (default: 50)
-    output_dir="./output"   # Optional: path to JSON summaries
-)
+```json
+{
+  "servers": {
+    "terraform-ingest-mcp": {
+      "command": "uvx",
+      "args": ["terraform-ingest@latest" , "mcp", "-c", "config.client.yaml"]
+    },
+  }
+}
 ```
 
-Returns repository information including:
-- URL and name
-- Description
-- Branches/tags analyzed
-- Module count
-- Providers used
-
-**search_modules**
-```python
-# Search for modules
-search_modules(
-    query="vpc",                    # Required: search term
-    repo_urls=["https://..."],      # Optional: specific repos
-    provider="aws",                 # Optional: filter by provider
-    output_dir="./output"           # Optional: path to JSON summaries
-)
-```
-
-Returns detailed module information including:
-- Repository and ref (branch/tag)
-- Variables and outputs
-- Providers and sub-modules
-- README content
-
-**search_modules_vector** *(New)*
-```python
-# Semantic search with vector embeddings
-search_modules_vector(
-    query="module for creating VPCs in AWS",  # Natural language query
-    provider="aws",                           # Optional: filter by provider
-    repository="https://...",                 # Optional: filter by repo
-    limit=10,                                 # Optional: max results
-    config_file="config.yaml"                 # Config with embedding settings
-)
-```
-
-Returns semantically similar modules with relevance scores. Requires vector database to be enabled in configuration.
+> **NOTE** If you have many modules and automatic import enabled it may take a while to get started.
 
 #### Example MCP Usage
 
@@ -267,7 +235,7 @@ python -m terraform_ingest.api
 - `POST /ingest` - Ingest multiple repositories
 - `POST /analyze` - Analyze a single repository
 - `POST /ingest-from-yaml` - Ingest from YAML configuration string
-- `POST /search/vector` - Search modules using vector embeddings *(New)*
+- `POST /search/vector` - Search modules using vector embeddings
 
 #### Example API Requests
 
@@ -301,7 +269,7 @@ curl -X POST http://localhost:8000/ingest \
   }'
 ```
 
-**Search with vector embeddings:** *(New)*
+**Search with vector embeddings:**
 
 ```bash
 curl -X POST http://localhost:8000/search/vector \
@@ -361,7 +329,7 @@ embedding:
 - `output_dir` (optional): Directory for JSON output files (default: "./output")
 - `clone_dir` (optional): Directory for cloning repositories (default: "./repos")
 
-**Embedding Options** *(New)*:
+**Embedding Options**:
 - `embedding.enabled` (optional): Enable vector database embeddings (default: false)
 - `embedding.strategy` (optional): Embedding strategy - "chromadb-default", "openai", "claude", or "sentence-transformers" (default: "chromadb-default")
 - `embedding.chromadb_path` (optional): Path to ChromaDB storage (default: "./chromadb")
