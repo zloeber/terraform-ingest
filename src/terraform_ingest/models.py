@@ -90,8 +90,7 @@ class McpConfig(BaseModel):
     host: str = "127.0.0.1"
     port: int = 3000
 
-    instructions: str = (
-        """
+    instructions: str = """
     You are a Terraform module assistant that helps users find and use infrastructure modules.
 
     CRITICAL RULES:
@@ -105,7 +104,6 @@ class McpConfig(BaseModel):
     - Filter results to prioritize tagged releases
     - If only branch versions exist, explicitly mention this as a risk in a comment within the code you generate
     """
-    )
 
     # Custom prompt overrides
     prompts: Optional[Dict[str, str]] = None

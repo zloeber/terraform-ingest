@@ -157,4 +157,3 @@ def test_ingest_config_with_embedding():
     assert config.embedding is not None
     assert config.embedding.enabled is True
     assert config.embedding.strategy == "chromadb-default"
-

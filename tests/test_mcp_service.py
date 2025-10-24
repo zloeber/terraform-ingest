@@ -113,7 +113,11 @@ def sample_output_dir():
                 ],
                 "modules": [],
                 "resources": [
-                    {"type": "azurerm_virtual_network", "name": "main", "description": None},
+                    {
+                        "type": "azurerm_virtual_network",
+                        "name": "main",
+                        "description": None,
+                    },
                     {"type": "azurerm_subnet", "name": "main", "description": None},
                 ],
                 "readme_content": "# Azure Network Terraform module\nThis module creates Azure network resources",
@@ -798,7 +802,9 @@ def test_get_module_document_aws_vpc(sample_output_dir):
 def test_get_module_document_not_found(sample_output_dir):
     """Test getting module documentation for non-existent module."""
     service = ModuleQueryService(sample_output_dir)
-    doc = service.get_module_document("https://github.com/nonexistent/repo", "main", ".")
+    doc = service.get_module_document(
+        "https://github.com/nonexistent/repo", "main", "."
+    )
 
     assert "Module not found" in doc
 
@@ -822,9 +828,7 @@ def test_get_module_resource(sample_output_dir):
 
     # Get module document directly using the service method
     doc = service.get_module_document(
-        "https://github.com/terraform-aws-modules/terraform-aws-vpc",
-        "main",
-        "."
+        "https://github.com/terraform-aws-modules/terraform-aws-vpc", "main", "."
     )
 
     assert "# Terraform Module:" in doc
@@ -839,9 +843,7 @@ def test_get_module_resource_impl_wrapper(sample_output_dir):
     from terraform_ingest.mcp_service import _get_module_resource_impl
 
     # Test with a non-existent module
-    doc = _get_module_resource_impl(
-        repository="nonexistent", ref="main", path="-"
-    )
+    doc = _get_module_resource_impl(repository="nonexistent", ref="main", path="-")
     assert "Module not found" in doc
 
 
@@ -862,9 +864,7 @@ def test_list_module_resources_for_discovery(sample_output_dir):
     """Test resource listing for MCP discovery."""
     from terraform_ingest.mcp_service import (
         set_mcp_context,
-        MCPContext,
         list_module_resources_for_discovery,
-        ModuleQueryService,
     )
     from terraform_ingest.ingest import TerraformIngest
 
@@ -888,7 +888,6 @@ def test_get_argument_completions_for_repositories(sample_output_dir):
     """Test argument completion for repository parameter."""
     from terraform_ingest.mcp_service import (
         set_mcp_context,
-        MCPContext,
         get_argument_completions_for_resources,
     )
     from terraform_ingest.ingest import TerraformIngest
@@ -908,7 +907,6 @@ def test_get_argument_completions_for_refs(sample_output_dir):
     """Test argument completion for ref parameter."""
     from terraform_ingest.mcp_service import (
         set_mcp_context,
-        MCPContext,
         get_argument_completions_for_resources,
     )
     from terraform_ingest.ingest import TerraformIngest
@@ -928,7 +926,6 @@ def test_get_argument_completions_for_paths(sample_output_dir):
     """Test argument completion for path parameter."""
     from terraform_ingest.mcp_service import (
         set_mcp_context,
-        MCPContext,
         get_argument_completions_for_resources,
     )
     from terraform_ingest.ingest import TerraformIngest
@@ -1058,7 +1055,9 @@ def test_generate_module_docs_default():
     # Ensure no custom prompts
     set_custom_prompts(None)
 
-    result = _generate_module_docs_impl(module_name="test-module", module_purpose="testing")
+    result = _generate_module_docs_impl(
+        module_name="test-module", module_purpose="testing"
+    )
 
     assert isinstance(result, str)
     assert "test-module" in result
@@ -1089,7 +1088,7 @@ def test_custom_prompts_in_mcp_context(sample_output_dir):
         _terraform_best_practices_impl,
     )
     from terraform_ingest.ingest import TerraformIngest
-    from terraform_ingest.models import IngestConfig, McpConfig
+    from terraform_ingest.models import McpConfig
 
     # Create a config with custom prompts
     ingester = TerraformIngest.from_yaml("config.yaml")
@@ -1098,9 +1097,7 @@ def test_custom_prompts_in_mcp_context(sample_output_dir):
     # Add custom prompts to the config
     if config.mcp is None:
         config.mcp = McpConfig()
-    config.mcp.prompts = {
-        "terraform_best_practices": "Custom org practices"
-    }
+    config.mcp.prompts = {"terraform_best_practices": "Custom org practices"}
 
     # Set the context with custom prompts
     set_mcp_context(ingester, config, False)

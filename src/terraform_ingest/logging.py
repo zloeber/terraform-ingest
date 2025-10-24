@@ -3,6 +3,7 @@
 """
 logging class that does general logging via loguru and prints to the console via rich.
 """
+
 import os
 import json
 import logging
