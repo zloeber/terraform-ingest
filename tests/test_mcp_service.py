@@ -870,6 +870,8 @@ def test_list_module_resources_for_discovery(sample_output_dir):
 
     # Initialize service and context
     ingester = TerraformIngest.from_yaml("config.yaml")
+    # Use the sample output directory for testing
+    ingester.config.output_dir = sample_output_dir
     set_mcp_context(ingester, ingester.config, False)
 
     resources = list_module_resources_for_discovery()
@@ -894,6 +896,8 @@ def test_get_argument_completions_for_repositories(sample_output_dir):
 
     # Initialize context
     ingester = TerraformIngest.from_yaml("config.yaml")
+    # Use the sample output directory for testing
+    ingester.config.output_dir = sample_output_dir
     set_mcp_context(ingester, ingester.config, False)
 
     completions = get_argument_completions_for_resources("repository", "terraform-aws")
@@ -913,6 +917,8 @@ def test_get_argument_completions_for_refs(sample_output_dir):
 
     # Initialize context
     ingester = TerraformIngest.from_yaml("config.yaml")
+    # Use the sample output directory for testing
+    ingester.config.output_dir = sample_output_dir
     set_mcp_context(ingester, ingester.config, False)
 
     completions = get_argument_completions_for_resources("ref", "main")
@@ -932,6 +938,8 @@ def test_get_argument_completions_for_paths(sample_output_dir):
 
     # Initialize context
     ingester = TerraformIngest.from_yaml("config.yaml")
+    # Use the sample output directory for testing
+    ingester.config.output_dir = sample_output_dir
     set_mcp_context(ingester, ingester.config, False)
 
     completions = get_argument_completions_for_resources("path", "")
@@ -1093,6 +1101,9 @@ def test_custom_prompts_in_mcp_context(sample_output_dir):
     # Create a config with custom prompts
     ingester = TerraformIngest.from_yaml("config.yaml")
     config = ingester.config
+
+    # Use the sample output directory for testing
+    config.output_dir = sample_output_dir
 
     # Add custom prompts to the config
     if config.mcp is None:

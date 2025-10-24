@@ -499,7 +499,13 @@ def set_mcp_context(
         vector_db_enabled: Whether vector database is enabled
         stdio_mode: Whether running in stdio mode (suppresses output)
     """
+    global _service
+
     MCPContext.set(ingester, config, vector_db_enabled, stdio_mode)
+
+    # Initialize the service with the output_dir from configuration
+    output_dir = config.output_dir if config else "./output"
+    _service = ModuleQueryService(output_dir)
 
     # Initialize custom prompts from configuration if available
     if config and config.mcp and config.mcp.prompts:
