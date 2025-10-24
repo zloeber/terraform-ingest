@@ -449,22 +449,22 @@ def serve(host, port):
 @click.option(
     "--transport",
     "-t",
-    type=click.Choice(["stdio", "http-streamable", "sse"]),
+    type=click.Choice(["stdio", "streamable-http", "sse"]),
     default=None,
-    help="Transport mode (stdio, http-streamable, or sse)",
+    help="Transport mode (stdio, streamable-http, or sse)",
 )
 @click.option(
     "--host",
     "-h",
     default=None,
-    help="Host to bind to (for http-streamable and sse transports)",
+    help="Host to bind to (for streamable-http and sse transports)",
 )
 @click.option(
     "--port",
     "-p",
     type=int,
     default=None,
-    help="Port to bind to (for http-streamable and sse transports)",
+    help="Port to bind to (for streamable-http and sse transports)",
 )
 @click.option(
     "--ingest-on-startup/--no-ingest-on-startup",
@@ -479,7 +479,7 @@ def mcp(config, transport, host, port, ingest_on_startup):
 
     Supported transports:
     - stdio (default): Standard input/output communication
-    - http-streamable: HTTP with streaming support
+    - streamable-http: HTTP with streaming support
     - sse: Server-Sent Events over HTTP
 
     Example:
@@ -490,7 +490,7 @@ def mcp(config, transport, host, port, ingest_on_startup):
 
         terraform-ingest mcp --ingest-on-startup
 
-        terraform-ingest mcp --transport http-streamable --host 0.0.0.0 --port 3000
+        terraform-ingest mcp --transport streamable-http --host 0.0.0.0 --port 3000
 
         terraform-ingest mcp --transport sse --host localhost --port 8000 --ingest-on-startup
     """
@@ -501,12 +501,12 @@ def mcp(config, transport, host, port, ingest_on_startup):
         config = os.getenv("TERRAFORM_INGEST_CONFIG", "config.yaml")
         os.environ["TERRAFORM_INGEST_CONFIG"] = config
 
-    if transport != "stdio" and transport is not None:
-        click.echo(f"Transport: {transport}")
-        click.echo(f"Address: {host or '127.0.0.1'}:{port or 3000}")
-        if ingest_on_startup is not None:
-            click.echo(f"Ingest on startup: {ingest_on_startup}")
-        click.echo("Press CTRL+C to quit")
+    # if transport != "stdio" and transport is not None:
+    #     click.echo(f"Transport: {transport}")
+    #     click.echo(f"Address: {host or '127.0.0.1'}:{port or 3000}")
+    #     if ingest_on_startup is not None:
+    #         click.echo(f"Ingest on startup: {ingest_on_startup}")
+    #     click.echo("Press CTRL+C to quit")
 
     try:
         mcp_main(

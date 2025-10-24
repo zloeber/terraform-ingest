@@ -21,7 +21,7 @@ mcp = FastMCP(
 )
 
 # Create MCP logger with flushing capability
-mcp_logger = get_mcp_logger("my_mcp_service")
+mcp_logger = get_mcp_logger("terraform-ingest")
 
 # Flush logs immediately to avoid buffering issues
 mcp_logger.flush_logs()
@@ -490,7 +490,8 @@ def set_mcp_context(
 ) -> None:
     """Set the MCP context with server configuration.
 
-    This function delegates to MCPContext singleton for state management.
+    This function delegates to MCPContext singleton for state management
+    and initializes custom prompt overrides from the configuration.
 
     Args:
         ingester: Configured TerraformIngest instance
@@ -499,6 +500,13 @@ def set_mcp_context(
         stdio_mode: Whether running in stdio mode (suppresses output)
     """
     MCPContext.set(ingester, config, vector_db_enabled, stdio_mode)
+
+    # Initialize custom prompts from configuration if available
+    if config and config.mcp and config.mcp.prompts:
+        set_custom_prompts(config.mcp.prompts)
+        mcp_logger.info(
+            f"Loaded {len(config.mcp.prompts)} custom prompt overrides from configuration"
+        )
 
     # Log vector database status
     if vector_db_enabled:
@@ -622,36 +630,36 @@ def get_module_details(
     return service.get_module(repository=repository, ref=ref, path=path)
 
 
-# @mcp.tool()
-# def list_modules(
-#     limit: int = 100, output_dir: str = "./output"
-# ) -> List[Dict[str, Any]]:
-#     """Lists all ingested Terraform modules with their metadata.
+@mcp.tool()
+def list_modules(
+    limit: int = 100, output_dir: str = "./output"
+) -> List[Dict[str, Any]]:
+    """Lists all ingested Terraform modules with their metadata.
 
-#     This tool provides an overview of all available modules including their
-#     location, the number of resources, variables, outputs, providers, and
-#     sub-modules they contain. Useful for discovering what modules are available.
+    This tool provides an overview of all available modules including their
+    location, the number of resources, variables, outputs, providers, and
+    sub-modules they contain. Useful for discovering what modules are available.
 
-#     Args:
-#         limit: Maximum number of modules to return (default: 100, max: 500)
-#         output_dir: Directory containing ingested JSON summaries (default: ./output)
+    Args:
+        limit: Maximum number of modules to return (default: 100, max: 500)
+        output_dir: Directory containing ingested JSON summaries (default: ./output)
 
-#     Returns:
-#         List of module metadata including:
-#         - repository: Git repository URL
-#         - ref: Branch or tag name
-#         - path: Path within repository
-#         - description: Module description
-#         - resource_count: Number of resources defined
-#         - variable_count: Number of input variables
-#         - output_count: Number of outputs
-#         - provider_count: Number of required providers
-#         - module_count: Number of sub-modules
-#     """
-#     service = get_service(output_dir)
-#     # Cap limit at 500
-#     limit = min(limit, 500)
-#     return service.list_modules(limit=limit)
+    Returns:
+        List of module metadata including:
+        - repository: Git repository URL
+        - ref: Branch or tag name
+        - path: Path within repository
+        - description: Module description
+        - resource_count: Number of resources defined
+        - variable_count: Number of input variables
+        - output_count: Number of outputs
+        - provider_count: Number of required providers
+        - module_count: Number of sub-modules
+    """
+    service = get_service(output_dir)
+    # Cap limit at 500
+    limit = min(limit, 500)
+    return service.list_modules(limit=limit)
 
 
 @mcp.tool()
@@ -773,43 +781,413 @@ def get_module_resource(repository: str, ref: str, path: str = "-") -> str:
     all resources it creates, providers required, input variables with descriptions,
     outputs, child modules, and the full README content.
 
-    The path parameter uses hyphens instead of slashes in the URI (e.g., "-" for ".",
-    "modules-aws" for "modules/aws"). Use list_module_resource_uris to get valid URIs.
+    The resource URI uses hyphens as path separators for compatibility with the URI
+    specification (e.g., "-" for ".", "modules-aws" for "modules/aws").
+
+    Module resources support dynamic lookup - provide repository name (or partial match),
+    ref (branch/tag), and path to retrieve any ingested module's complete documentation.
 
     Args:
-        repository: Module repository name from the resource URI
-        ref: Module ref (branch/tag) from the resource URI
-        path: Module path from the resource URI (hyphens will be converted to slashes)
+        repository: Module repository name (can be partial, will match against full URL)
+        ref: Module ref (branch/tag name)
+        path: Module path (hyphen-encoded, e.g., "-" for root, "modules-aws" for modules/aws)
 
     Returns:
-        Full module documentation as formatted text
+        Full module documentation as formatted text with all metadata
+    """
+    return _get_module_resource_impl(repository, ref, path)
+
+
+def list_module_resources_for_discovery() -> List[Dict[str, Any]]:
+    """List all available module resources for MCP discovery.
+
+    This function provides the resource listing that enables clients to discover
+    available module resources before accessing them.
+
+    Returns:
+        List of available module resources with URI, name, and description
     """
     service = get_service()
+    resources = []
 
-    # Decode path: hyphens back to slashes
-    decoded_path = path.replace("-", "/")
-    if decoded_path == "/":
-        decoded_path = "."
+    for module_info in service.list_module_resource_uris():
+        uri = module_info.get("uri", "")
+        name = module_info.get("name", "")
+        description = module_info.get("description", "")
+        repository = module_info.get("repository", "")
+        ref = module_info.get("ref", "")
+        path = module_info.get("path", ".")
 
-    # Try to reconstruct the repository URL
-    # The repository name in the URI is just the basename, so we need to search for matching modules
-    summaries = service._load_all_summaries()
-    for summary in summaries:
-        summary_ref = summary.get("ref")
-        summary_path = summary.get("path", ".")
-        summary_repo = summary.get("repository", "")
-
-        # Check if this summary matches our criteria
-        ref_matches = summary_ref == ref
-        path_matches = (decoded_path == "." and summary_path == ".") or (
-            decoded_path != "." and decoded_path in summary_path
+        resources.append(
+            {
+                "uri": uri,
+                "name": name,
+                "title": f"{name} - {path}",
+                "description": description
+                or f"Terraform module from {repository} @ {ref}",
+                "mimeType": "text/markdown",
+            }
         )
-        repo_matches = repository in summary_repo
 
-        if ref_matches and path_matches and repo_matches:
-            return service.get_module_document(summary_repo, ref, summary_path)
+    return resources
 
-    return f"Module not found: {repository} @ {ref} ({decoded_path})"
+
+def get_argument_completions_for_resources(
+    argument_name: str, argument_value: str
+) -> List[str]:
+    """Get argument completion suggestions for module resource URIs.
+
+    This function supports argument completion for the dynamic resource template,
+    allowing clients to discover valid values for repository, ref, and path parameters.
+
+    Args:
+        argument_name: Name of the argument being completed (repository, ref, or path)
+        argument_value: Current value the user is typing
+
+    Returns:
+        List of matching completion suggestions
+    """
+    service = get_service()
+    summaries = service._load_all_summaries()
+
+    if argument_name == "repository":
+        # Suggest repository names (basename from URL)
+        repos = set()
+        for summary in summaries:
+            repo_url = summary.get("repository", "")
+            if repo_url:
+                # Extract basename and remove .git suffix
+                repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
+                if argument_value.lower() in repo_name.lower():
+                    repos.add(repo_name)
+        return sorted(list(repos))
+
+    elif argument_name == "ref":
+        # Suggest ref names (branches/tags)
+        refs = set()
+        for summary in summaries:
+            ref = summary.get("ref", "")
+            if ref and argument_value.lower() in ref.lower():
+                refs.add(ref)
+        return sorted(list(refs))
+
+    elif argument_name == "path":
+        # Suggest paths
+        paths = set()
+        for summary in summaries:
+            path = summary.get("path", ".")
+            # Encode path for URI (replace / with -)
+            encoded_path = path.replace("/", "-").replace(".", "-")
+            if argument_value.lower() in encoded_path.lower():
+                paths.add(encoded_path)
+        return sorted(list(paths))
+
+    return []
+
+
+# Prompt customization support
+# Store custom prompt overrides from configuration
+_custom_prompts: Dict[str, str] = {}
+
+
+def set_custom_prompts(prompts: Optional[Dict[str, str]]) -> None:
+    """Set custom prompt overrides from configuration.
+
+    This allows the configuration file to override default prompt content
+    for terraform_best_practices, security_checklist, and generate_module_docs.
+
+    Args:
+        prompts: Dict mapping prompt names to custom content strings
+    """
+    global _custom_prompts
+    _custom_prompts = prompts or {}
+
+
+def get_custom_prompt(name: str) -> Optional[str]:
+    """Get a custom prompt override if it exists.
+
+    Args:
+        name: Name of the prompt (e.g., "terraform_best_practices", "security_checklist")
+
+    Returns:
+        Custom prompt content if defined, None otherwise
+    """
+    return _custom_prompts.get(name)
+
+
+# Internal implementations for testable prompt functions
+def _terraform_best_practices_impl(module_type: str = "general") -> str:
+    """Generate a prompt with Terraform best practices.
+
+    This is the internal implementation that can be overridden via custom prompts.
+
+    Args:
+        module_type: Type of module (general, networking, compute, storage, security)
+
+    Returns:
+        Best practices prompt for the specified module type
+    """
+    # Check for custom override
+    custom = get_custom_prompt("terraform_best_practices")
+    if custom:
+        return custom
+
+    base_practices = """
+Follow these Terraform best practices when generating infrastructure code:
+
+1. Code Organization & Structure
+   - Use meaningful variable names and descriptions
+   - Keep modules focused on single responsibilities
+   - Define all variables with types
+   - Always provide descriptions for variables and outputs
+
+2. Version Management
+   - Always specify versions for providers and modules
+   - Use version constraints appropriately (>= for stability, ~> for minor updates)
+   - Use local module sources for internal modules
+   - Document version compatibility requirements
+
+3. Documentation
+   - Document all outputs with descriptions
+   - Include README files with usage examples
+   - Add comments for complex logic
+   - Maintain a changelog for module updates
+
+4. Configuration Best Practices
+   - Use data sources instead of hardcoding values
+   - Implement appropriate tagging strategy
+   - Surface all variable assignments in terraform.tfvars files
+   - Use sensitive variables for credentials and secrets
+   - Never hardcode credentials or secrets
+"""
+
+    module_specific = {
+        "networking": """
+5. Networking-Specific
+   - Use VPCs for network isolation
+   - Implement proper security groups and NACLs
+   - Use private subnets for sensitive resources
+   - Implement VPC endpoints where appropriate
+   - Document network topology
+""",
+        "compute": """
+5. Compute-Specific
+   - Use auto-scaling groups for availability
+   - Implement health checks
+   - Use latest stable AMIs
+   - Tag resources for cost tracking
+   - Set appropriate timeout values
+""",
+        "storage": """
+5. Storage-Specific
+   - Enable encryption for data at rest
+   - Enable versioning for important buckets
+   - Implement lifecycle policies
+   - Use appropriate storage classes
+   - Document backup strategies
+""",
+        "security": """
+5. Security-Specific
+   - Implement least privilege access
+   - Use IAM roles instead of access keys
+   - Enable audit logging
+   - Implement network segmentation
+   - Regular security assessments
+""",
+    }
+
+    return base_practices + module_specific.get(module_type.lower(), "")
+
+
+def _security_checklist_impl() -> list:
+    """Generate a comprehensive security review checklist prompt.
+
+    This is the internal implementation that can be overridden via custom prompts.
+
+    Returns:
+        List of messages that guide users through a security review
+    """
+    from mcp.server.fastmcp.prompts.base import UserMessage
+
+    # Check for custom override
+    custom = get_custom_prompt("security_checklist")
+    if custom:
+        return [UserMessage(custom)]
+
+    return [
+        UserMessage(
+            """
+Please review the following Terraform configuration for security compliance.
+
+Use this checklist:
+
+ACCESS CONTROL:
+- [ ] IAM roles follow least privilege principle
+- [ ] Root account not used for daily operations
+- [ ] MFA enabled for sensitive operations
+- [ ] Service accounts have minimal required permissions
+- [ ] Cross-account access properly scoped
+
+ENCRYPTION:
+- [ ] Data at rest encrypted with appropriate KMS keys
+- [ ] Data in transit uses TLS/SSL (version >= 1.2)
+- [ ] Secrets stored in secrets manager, not configs
+- [ ] Encryption keys properly rotated
+- [ ] Database encryption enabled
+
+LOGGING & MONITORING:
+- [ ] CloudTrail enabled for API auditing
+- [ ] Application logs centralized and retained
+- [ ] Alerts configured for suspicious activity
+- [ ] VPC Flow Logs enabled
+- [ ] CloudWatch monitoring for key metrics
+
+NETWORK SECURITY:
+- [ ] Security groups restrict inbound traffic
+- [ ] Network ACLs properly configured
+- [ ] Private subnets used for sensitive resources
+- [ ] VPC endpoints implemented
+- [ ] Network segmentation implemented
+
+COMPLIANCE & GOVERNANCE:
+- [ ] Resource tagging strategy implemented
+- [ ] Change management documented
+- [ ] Incident response plan in place
+- [ ] Regular backups configured
+- [ ] Disaster recovery tested
+
+Provide feedback on any findings and recommendations for remediation.
+"""
+        )
+    ]
+
+
+def _generate_module_docs_impl(module_name: str = "", module_purpose: str = "") -> str:
+    """Generate documentation structure for a Terraform module.
+
+    This is the internal implementation that can be overridden via custom prompts.
+
+    Args:
+        module_name: Name of the module
+        module_purpose: The purpose/function of the module
+
+    Returns:
+        Template for module documentation
+    """
+    # Check for custom override
+    custom = get_custom_prompt("generate_module_docs")
+    if custom:
+        return custom
+
+    return f"""
+Generate comprehensive documentation for the Terraform module: {module_name}
+
+Purpose: {module_purpose}
+
+Create documentation with the following sections:
+
+## Overview
+- Description of what the module does
+- Use cases and scenarios
+- Key benefits
+
+## Requirements
+- Terraform version requirements
+- Provider requirements and versions
+- External dependencies
+
+## Module Structure
+- Directory layout explanation
+- Key files and their purposes
+- Input and output interfaces
+
+## Inputs (Variables)
+- List all input variables
+- Document type, default, and constraints
+- Provide examples
+
+## Outputs
+- List all outputs
+- Explain what each output represents
+- Show example usage
+
+## Usage Example
+- Provide a minimal working example
+- Show how to call the module
+- Document variable input
+
+## Advanced Usage
+- Advanced configuration options
+- Integration patterns
+- Performance tuning
+
+## Troubleshooting
+- Common issues and solutions
+- Debug approaches
+- Support information
+
+## Contributing
+- How to contribute improvements
+- Testing requirements
+- Release process
+
+## License
+- License information
+- Copyright notice
+"""
+
+
+# Prompts for AI agents
+@mcp.prompt(title="Terraform Best Practices")
+def terraform_best_practices(
+    module_type: str = "general",
+) -> str:
+    """Generate a prompt with Terraform best practices.
+
+    This prompt provides standardized best practices for creating and
+    maintaining Terraform infrastructure code. Can be overridden via
+    mcp.prompts.terraform_best_practices in the configuration file.
+
+    Args:
+        module_type: Type of module (general, networking, compute, storage, security)
+
+    Returns:
+        Best practices prompt for the specified module type
+    """
+    return _terraform_best_practices_impl(module_type)
+
+
+@mcp.prompt(title="Security Review Checklist")
+def security_checklist() -> list:
+    """Generate a comprehensive security review checklist prompt.
+
+    Can be overridden via mcp.prompts.security_checklist in the configuration file.
+
+    Returns a list of messages that guide users through a security review
+    of their Terraform configurations.
+    """
+    return _security_checklist_impl()
+
+
+@mcp.prompt(title="Module Documentation Generator")
+def generate_module_docs(
+    module_name: str = "",
+    module_purpose: str = "",
+) -> str:
+    """Generate documentation structure for a Terraform module.
+
+    Can be overridden via mcp.prompts.generate_module_docs in the configuration file.
+
+    This prompt helps create comprehensive documentation for modules.
+
+    Args:
+        module_name: Name of the module
+        module_purpose: The purpose/function of the module
+
+    Returns:
+        Template for module documentation
+    """
+    return _generate_module_docs_impl(module_name, module_purpose)
 
 
 # Testable wrapper functions (not decorated with @mcp.tool())
@@ -975,9 +1353,9 @@ def start(
 
     Args:
         config_file: Path to the configuration file (default: TERRAFORM_INGEST_CONFIG env var or "config.yaml")
-        transport: Transport mode (stdio, http-streamable, sse) - overrides config
-        host: Host to bind to (for http-streamable and sse) - overrides config
-        port: Port to bind to (for http-streamable and sse) - overrides config
+        transport: Transport mode (stdio, streamable-http, sse) - overrides config
+        host: Host to bind to (for streamable-http and sse) - overrides config
+        port: Port to bind to (for streamable-http and sse) - overrides config
         ingest_on_startup: Run ingestion on startup - overrides config
     """
     # Check for MCP configuration and auto-ingestion
@@ -1029,10 +1407,10 @@ def start(
     # Run with appropriate transport
     if transport_mode == "stdio":
         mcp.run()
-    elif transport_mode == "http-streamable":
-        mcp.run(transport="http-streamable", bind_address=(bind_host, bind_port))
+    elif transport_mode == "streamable-http":
+        mcp.run(transport="streamable-http", host=bind_host, port=bind_port)
     elif transport_mode == "sse":
-        mcp.run(transport="sse", bind_address=(bind_host, bind_port))
+        mcp.run(transport="sse", host=bind_host, port=bind_port)
     else:
         raise ValueError(f"Unknown transport mode: {transport_mode}")
 
@@ -1078,8 +1456,8 @@ def main():
     # Run with appropriate transport
     if transport_mode == "stdio":
         mcp.run()
-    elif transport_mode == "http-streamable":
-        mcp.run(transport="http-streamable", bind_address=(bind_host, bind_port))
+    elif transport_mode == "streamable-http":
+        mcp.run(transport="streamable-http", bind_address=(bind_host, bind_port))
     elif transport_mode == "sse":
         mcp.run(transport="sse", bind_address=(bind_host, bind_port))
     else:

@@ -1,6 +1,6 @@
 """Data models for terraform-ingest."""
 
-from typing import List, Optional, Any, Literal
+from typing import List, Optional, Any, Literal, Dict
 from pydantic import BaseModel, Field
 
 
@@ -86,7 +86,7 @@ class McpConfig(BaseModel):
     refresh_interval_hours: Optional[int] = None
 
     # Transport configuration
-    transport: Literal["stdio", "http-streamable", "sse"] = "stdio"
+    transport: Literal["stdio", "streamable-http", "sse"] = "stdio"
     host: str = "127.0.0.1"
     port: int = 3000
 
@@ -106,6 +106,9 @@ class McpConfig(BaseModel):
     - If only branch versions exist, explicitly mention this as a risk in a comment within the code you generate
     """
     )
+
+    # Custom prompt overrides
+    prompts: Optional[Dict[str, str]] = None
 
 
 class EmbeddingConfig(BaseModel):

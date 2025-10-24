@@ -6,11 +6,19 @@ theme:
     scheme: slate
   name: material
 nav:
-  - 'index.md'
-  - 'Docker': 'DOCKER.md'
-  - 'Quickstart': 'QUICKSTART.md'
-  - 'Docker': 'DOCKER.md'
-  - 'MCP': 'MCP.md'
+  - 'Home': index.md
+  - 'Quickstart': quickstart.md
+  - 'Development': development.md
+  - 'Vector Database': vectordb.md
+  - 'Vector Embeddings': embeddings.md
+  - 'MCP': mcp.md
+  - 'MCP Prompts': mcp_prompts.md
+  - 'MCP Resources': mcp_resources.md
+  - 'Docker': docker.md
+  - 'Docker Architecture': docker_arch.md
+  - 'Docker Guide': docker_guide.md
+  - 'Docker Complete': docker_complete.md
+  - 'Docker Quickstart': docker_quick_ref.md
 
 markdown_extensions:
   - mkdocs-click
@@ -34,14 +42,11 @@ plugins:
     sections:
       Usage:
       - index.md: Index
-      - QUICKSTART.md: Quickstart Guide
-      - QUICKSTART_EMBEDDINGS.md: Quickstart with Embeddings
-      - DEVELOPMENT.md: Development Guide
-      - VECTORDB.md: Vector Database Setup
-      - MCP.md: MCP Server usage
-      Docker:
-      - DOCKER.md: Docker usage
-      - DOCKER_ARCHITECTURE.md: Docker Architecture
-      - DOCKER_USAGE_GUIDE.md: Docker Usage Guide
-      - DOCKER_QUICK_REFERENCE.md: Docker Quick Reference
-      - DOCKER_COMPLETE.md: Docker Complete Reference
+      - quickstart.md: Quickstart Guide
+      - development.md: Development Guide
+      - vectordb.md: Vector Database Setup
+      - embeddings.md: Vector Database Embeddings
+      - mcp.md: MCP Server usage
+      - mcp_prompts.md: MCP Custom Prompts
+      - mcp_resources.md: MCP Resources
+      - docker_quick_ref.md: Docker Quick Reference

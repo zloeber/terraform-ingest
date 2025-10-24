@@ -685,8 +685,8 @@ def get_mcp_logger(name: str = "mcp") -> Any:
         >>> mcp_logger.info("MCP service started")
         >>> mcp_logger.flush_logs()  # Ensure logs are written immediately
     """
-    console_file = get_console_stream()
-    config = LoggerConfig(name=name, console_file_object=console_file)
+    console_file_object = get_console_stream()
+    config = LoggerConfig(name=name, console_file_object=console_file_object)
     return UnifiedLogger(config)
 
 
