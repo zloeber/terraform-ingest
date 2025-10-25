@@ -1,4 +1,5 @@
 name: GitHub Actions Updates Check
+run-name: GitHub Actions Update Check
 
 on:
   schedule:

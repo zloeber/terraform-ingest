@@ -1,4 +1,5 @@
 name: Docs
+run-name: Build and Deploy Docs - ${{ github.ref_name }}
 
 on:
   push:
