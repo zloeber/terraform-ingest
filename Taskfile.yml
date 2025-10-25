@@ -218,3 +218,7 @@ tasks:
     env:
       DANGEROUSLY_OMIT_AUTH: true
 
+  update:actions:
+    desc: Update GitHub Actions in workflows
+    cmds:
+      - npx actions-up -y
