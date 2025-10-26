@@ -208,7 +208,7 @@ class RepositoryManager:
 
         if recursive:
             # Recursively find all directories containing terraform files
-            for root, dirs, files in os.walk(full_module_path):
+            for root, _, _ in os.walk(full_module_path):
                 root_path = Path(root)
                 # Get relative path from repo root for exclusion matching
                 try:

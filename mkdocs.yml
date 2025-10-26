@@ -12,9 +12,7 @@ nav:
   - 'Vector Database': vectordb.md
   - 'Vector Embeddings': embeddings.md
   - 'MCP': mcp.md
-  - 'MCP Usage Example': mcp_use_example.md
-  - 'MCP Prompts': mcp_prompts.md
-  - 'MCP Resources': mcp_resources.md
+  - 'MCP Usage Examples': mcp_use_examples.md
   - 'Docker': docker.md
   - 'Docker Architecture': docker_arch.md
   - 'Docker Guide': docker_guide.md
@@ -48,7 +46,5 @@ plugins:
       - vectordb.md: Vector Database Setup
       - embeddings.md: Vector Database Embeddings
       - mcp.md: MCP Server usage
-      - mcp_use_example.md: MCP Usage Example
-      - mcp_prompts.md: MCP Custom Prompts
-      - mcp_resources.md: MCP Resources
+      - mcp_use_examples.md: MCP Usage Examples
       - docker_quick_ref.md: Docker Quick Reference

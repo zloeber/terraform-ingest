@@ -6,7 +6,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Context
 
 from terraform_ingest.models import IngestConfig
 from terraform_ingest.ingest import TerraformIngest
@@ -506,7 +506,7 @@ def set_mcp_context(
         vector_db_enabled: Whether vector database is enabled
         stdio_mode: Whether running in stdio mode (suppresses output)
     """
-    global _service
+    # global _service
 
     MCPContext.set(ingester, config, vector_db_enabled, stdio_mode)
 
@@ -1151,6 +1151,37 @@ Create documentation with the following sections:
 
 
 # Prompts for AI agents
+@mcp.prompt(
+    title="Find Best Terraform Module"
+)
+def find_best_terraform_module_prompt(
+    keywords: str,
+    provider: str
+) -> str:
+    """Generate a prompt to help find a Terraform module.
+    This prompt guides users in searching for relevant Terraform modules
+    based on their requirements. 
+
+    Args:
+        keywords: Keywords describing the desired Terraform module
+        provider: Cloud provider for the Terraform module
+
+    Returns:
+        Prompt string for finding Terraform modules
+    """
+    # if _service.vector_db_enabled:
+    #     search_tool = "search_modules_vector"
+    # else:
+    #     search_tool = "search_modules"
+    return (
+        f"""Use the search_modules_vector tool to find the top 5 Terraform modules related to the following query: {keywords}
+for the {provider} provider. For each module. use the get_module_details tool to retrieve detailed information
+about the module, including its variables, outputs, providers, and README content.
+Summarize the key features of each module and determine the best fit for the user's requirements if any are found.
+Return the module repository URL, ref, path, and a brief summary of why it is a good fit.
+"""
+    )
+
 @mcp.prompt(title="Terraform Best Practices")
 def terraform_best_practices(
     module_type: str = "general",
@@ -1267,29 +1298,32 @@ def _get_module_resource_impl(repository: str, ref: str, path: str = "-") -> str
     """Implementation of get_module_resource for testing."""
     service = get_service()
 
-    # Decode path: hyphens back to slashes
+    # Decode path: hyphens back to slashes, then to underscores for filename
     decoded_path = path.replace("-", "/")
-    if decoded_path == "/":
-        decoded_path = "."
 
-    # Try to reconstruct the repository URL
-    # The repository name in the URI is just the basename, so we need to search for matching modules
-    summaries = service._load_all_summaries()
-    for summary in summaries:
-        if (
-            summary.get("ref") == ref
-            and (
-                decoded_path == "."
-                and summary.get("path") == "."
-                or decoded_path in summary.get("path", "")
-            )
-            and repository in summary.get("repository", "")
-        ):
-            full_repo_url = summary.get("repository", "")
-            full_path = summary.get("path", ".")
-            return service.get_module_document(full_repo_url, ref, full_path)
+    # Reconstruct the filename from the parts
+    # Filename format: {repository}_{ref}_{path}.json
+    # For root path (.), the filename is: {repository}_{ref}_src.json
+    if decoded_path == "/" or decoded_path == ".":
+        filename = f"{repository}_{ref}.json"
+    else:
+        # Replace slashes with underscores in path for filename
+        safe_path = decoded_path.replace("/", "_")
+        filename = f"{repository}_{ref}_{safe_path}.json"
 
-    return f"Module not found: {repository} @ {ref} ({decoded_path})"
+    # Read the JSON file directly
+    json_file = service.output_dir / filename
+
+    if not json_file.exists():
+        return f"Module not found: {repository} @ {ref} ({decoded_path})"
+
+    try:
+        with open(json_file, "r", encoding="utf-8") as f:
+            module_data = json.load(f)
+            # Return as JSON string
+            return json.dumps(module_data, indent=2, default=str)
+    except Exception as e:
+        return f"Error reading module resource: {e}"
 
 
 def _load_config_file(config_file: str = "config.yaml") -> Optional[IngestConfig]:

@@ -166,13 +166,6 @@ First run downloads models (~100MB). This is normal.
 2. Check that modules were upserted: look for "Upserted to vector database" messages
 3. Try a broader query
 
-## Next Steps
-
-- Read the [full documentation](docs/vector_database_embeddings_FEATURE.md)
-- Try different embedding strategies
-- Explore metadata filtering
-- Use the MCP service with AI agents
-
 ## Common Use Cases
 
 ### Find modules for a specific cloud provider
@@ -199,10 +192,3 @@ terraform-ingest search "vpc with vpn and direct connect support"
 3. **Adjust result limit** - use `--limit 3` for faster results
 4. **Use local models** - sentence-transformers avoids API costs
 5. **Enable only needed content** - set `include_readme: false` if not needed
-
-## Support
-
-For issues or questions:
-- Check [docs/vector_database_embeddings_FEATURE.md](docs/vector_database_embeddings_FEATURE.md)
-- Review [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)
-- File an issue on GitHub

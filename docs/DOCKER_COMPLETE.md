@@ -25,13 +25,13 @@ I've successfully created a comprehensive multi-stage Docker setup for `terrafor
    - SSH key support for private repositories
 
 ### Documentation Files (5)
-4. **`DOCKER.md`** (Quick Start Guide)
+4. **`docker.md`** (Quick Start Guide)
    - 🚀 Quick start for all three modes
    - 📋 Common tasks
    - 💡 Tips and tricks
    - 🔧 Troubleshooting basics
 
-5. **`docs/DOCKER_USAGE_GUIDE.md`** (Comprehensive Guide)
+5. **`docker_guide.md`** (Comprehensive Guide)
    - 🌍 600+ lines of detailed documentation
    - All three execution modes explained
    - API endpoint documentation
@@ -39,26 +39,19 @@ I've successfully created a comprehensive multi-stage Docker setup for `terrafor
    - Production deployment examples
    - Troubleshooting section
 
-6. **`docs/DOCKER_QUICK_REFERENCE.md`** (Quick Reference)
+6. **`docker_quick_ref.md`** (Quick Reference)
    - ⚡ Common commands
    - 📊 Options table
    - Environment variables
    - Docker Compose shortcuts
    - Health check commands
 
-7. **`docs/DOCKER_IMPLEMENTATION.md`** (Implementation Details)
+7. **`docker_complete.md`** (Implementation Details)
    - 📝 What was built and why
    - Build optimization strategies
    - Security features explained
    - GitHub Actions workflow details
    - Production deployment examples (Kubernetes)
-
-8. **`docs/DOCKER_CHECKLIST.md`** (Verification Checklist)
-   - ✅ Features implemented
-   - 📋 Build commands
-   - Environment variables by mode
-   - Security features checklist
-   - Performance optimizations
 
 ### CI/CD Files (1)
 9. **`.github/workflows/docker-build.yml`** (141 lines)
@@ -234,10 +227,10 @@ docker-compose --profile dev up
 ## 📚 Documentation Structure
 
 ```
-DOCKER.md                                 ← Start here!
-├── docs/DOCKER_USAGE_GUIDE.md           ← Full guide (600+ lines)
-├── docs/DOCKER_QUICK_REFERENCE.md       ← Quick reference
-├── docs/DOCKER_IMPLEMENTATION.md        ← Implementation details
+docker.md                                 ← Start here!
+├── docker_guide.md           ← Full guide (600+ lines)
+├── docker_quick_ref.md       ← Quick reference
+├── docker_complete.md        ← Implementation details
 ├── docs/DOCKER_CHECKLIST.md             ← Verification & next steps
 └── Dockerfile                             ← Source
     docker-compose.yml
@@ -357,10 +350,10 @@ spec:
 
 | Need | File | Purpose |
 |------|------|---------|
-| Quick start | `DOCKER.md` | Get started immediately |
-| All details | `docs/DOCKER_USAGE_GUIDE.md` | Comprehensive guide |
-| Commands | `docs/DOCKER_QUICK_REFERENCE.md` | Copy-paste commands |
-| How it works | `docs/DOCKER_IMPLEMENTATION.md` | Technical details |
+| Quick start | `docker.md` | Get started immediately |
+| All details | `docker_guide.md` | Comprehensive guide |
+| Commands | `docker_quick_ref.md` | Copy-paste commands |
+| How it works | `docker_complete.md` | Technical details |
 | Verify | `docs/DOCKER_CHECKLIST.md` | Check everything |
 | Build source | `Dockerfile` | See actual code |
 
@@ -407,7 +400,7 @@ chmod 600 ~/.ssh/id_rsa && chmod 700 ~/.ssh
 docker run -p 8001:8000 terraform-ingest:api  # Use different port
 ```
 
-For more help, see `docs/DOCKER_USAGE_GUIDE.md`
+For more help, see `docker_guide.md`
 
 ## 🎉 What You Can Do Now
 
@@ -424,13 +417,13 @@ For more help, see `docs/DOCKER_USAGE_GUIDE.md`
 
 ## 📞 Support
 
-- **Full Guide**: `docs/DOCKER_USAGE_GUIDE.md`
-- **Quick Ref**: `docs/DOCKER_QUICK_REFERENCE.md`
-- **Implementation**: `docs/DOCKER_IMPLEMENTATION.md`
+- **Full Guide**: `docker_guide.md`
+- **Quick Ref**: `docker_quick_ref.md`
+- **Implementation**: `docker_complete.md`
 - **Checklist**: `docs/DOCKER_CHECKLIST.md`
 
 ---
 
 **Status**: ✅ **COMPLETE & READY TO USE**
 
-Start with `DOCKER.md` for quick start, or dive into `docs/DOCKER_USAGE_GUIDE.md` for comprehensive details!
+Start with `docker.md` for quick start, or dive into `docker_guide.md` for comprehensive details!

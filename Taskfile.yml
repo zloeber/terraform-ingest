@@ -142,7 +142,6 @@ tasks:
     cmds:
       - |
         uv pip install -e ".[docs]"
-        uv run mdtoc README.md
         uv run mkdocs build
 
   test:

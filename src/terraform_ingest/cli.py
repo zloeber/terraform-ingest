@@ -12,7 +12,7 @@ from terraform_ingest.ingest import TerraformIngest
 from terraform_ingest.models import IngestConfig
 from terraform_ingest import __version__, CONFIG_PATH
 from terraform_ingest.mcp_service import start as mcp_main
-
+from terraform_ingest.mcp_service import _get_module_resource_impl
 
 @click.group()
 @click.version_option(version=__version__)
@@ -615,6 +615,70 @@ def show(output_dir, format):
 
     except Exception as e:
         click.echo(f"Error showing functions: {e}", err=True)
+        raise click.Abort()
+
+
+@cli.command()
+@click.argument("resource_path")
+@click.option(
+    "--output-dir",
+    "-o",
+    default="./output",
+    help="Directory containing ingested module summaries",
+)
+def resource(resource_path, output_dir):
+    """Retrieve and display an MCP resource by its path.
+
+    RESOURCE_PATH: MCP resource path in the format 'module://repository/ref/path'
+
+    This command retrieves a specific Terraform module resource and returns
+    its JSON summary including variables, outputs, providers, and README.
+
+    Example:
+
+        terraform-ingest resource module://terraform-aws-vpc/v5.0.0
+
+        terraform-ingest resource module://terraform-aws-ec2/main
+
+        terraform-ingest resource module://terraform-aws-vpc/v5.0.0/modules-networking
+    """
+    try:
+        # Parse the resource path
+        # Expected format: module://repository/ref/path
+        if not resource_path.startswith("module://"):
+            click.echo(
+                "Error: Resource path must start with 'module://' (e.g., module://terraform-aws-vpc/v5.0.0)",
+                err=True,
+            )
+            raise click.Abort()
+
+        # Remove the 'module://' prefix and split
+        path_parts = resource_path[9:].split("/")
+
+        if len(path_parts) < 2:
+            click.echo(
+                "Error: Resource path must include repository and ref (e.g., module://repository/ref)",
+                err=True,
+            )
+            click.echo(
+                "Optional path parameter: module://repository/ref/path",
+                err=True,
+            )
+            raise click.Abort()
+
+        repository_name = path_parts[0]
+        ref = path_parts[1]
+        resource_subpath = "/".join(path_parts[2:]) if len(path_parts) > 2 else "-"
+
+        # Use the MCP implementation to get the resource
+        result = _get_module_resource_impl(repository_name, ref, resource_subpath)
+
+        click.echo(result)
+
+    except click.Abort:
+        raise
+    except Exception as e:
+        click.echo(f"Error retrieving resource: {e}", err=True)
         raise click.Abort()
 
 
