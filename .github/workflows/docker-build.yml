@@ -70,8 +70,8 @@ jobs:
           push: ${{ github.event_name != 'pull_request' && github.ref_type == 'tag' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
+          #cache-from: type=gha
+          #cache-to: type=gha,mode=min
           build-args: DEPLOY_VERSION=${{ steps.version.outputs.version }}
     
       - name: Generate artifact attestation
