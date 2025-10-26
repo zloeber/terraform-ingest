@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 from typing import Any, List, Optional
 import git
+from packaging.version import parse as parse_version, InvalidVersion
 from .models import RepositoryConfig, TerraformModuleSummary
 from .parser import TerraformParser
 from .logging import get_logger
@@ -261,25 +262,49 @@ class RepositoryManager:
         return len(tf_files) > 0
 
     def _get_tags(self, repo: git.Repo, max_tags: Optional[int] = None) -> List[str]:
-        """Get a list of tags from the repository.
+        """Get a list of tags from the repository, sorted by semantic version.
+
+        Tags are sorted using semantic versioning (like git tag -l | sort -r -V).
+        Tags that don't parse as valid semantic versions are included at the end,
+        sorted alphabetically in reverse order.
 
         Args:
             repo: GitPython Repo instance
             max_tags: Maximum number of tags to return
 
         Returns:
-            List of tag names
+            List of tag names sorted by semantic version in descending order
         """
         try:
-            tags = sorted(
-                repo.tags, key=lambda t: t.commit.committed_datetime, reverse=True
-            )
-            tag_names = [tag.name for tag in tags]
+            tag_names = [tag.name for tag in repo.tags]
+
+            if not tag_names:
+                return []
+
+            # Separate valid semantic versions from non-versions
+            valid_versions = []
+            non_versions = []
+
+            for tag_name in tag_names:
+                try:
+                    version = parse_version(tag_name)
+                    # Skip pre-release and dev versions if desired, or include them
+                    valid_versions.append((tag_name, version))
+                except InvalidVersion:
+                    # Tags that don't parse as versions
+                    non_versions.append(tag_name)
+
+            # Sort valid versions in descending order
+            valid_versions.sort(key=lambda x: x[1], reverse=True)
+            sorted_tag_names = [tag_name for tag_name, _ in valid_versions]
+
+            # Add non-version tags at the end, sorted reverse alphabetically
+            sorted_tag_names.extend(sorted(non_versions, reverse=True))
 
             if max_tags:
-                tag_names = tag_names[:max_tags]
+                sorted_tag_names = sorted_tag_names[:max_tags]
 
-            return tag_names
+            return sorted_tag_names
         except Exception as e:
             self.logger.error(f"Error getting tags: {e}")
             return []

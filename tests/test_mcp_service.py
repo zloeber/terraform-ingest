@@ -458,14 +458,15 @@ def test_get_module_details_wrong_path(sample_output_dir):
 
 def test_mcp_get_module_details_tool(sample_output_dir):
     """Test the MCP get_module_details tool function."""
-    from terraform_ingest.mcp_service import _get_module_details_impl
+    from terraform_ingest.mcp_service import ModuleQueryService
 
-    # Test retrieving a module successfully
-    module = _get_module_details_impl(
+    service = ModuleQueryService(sample_output_dir)
+
+    # Test retrieving a module successfully without readme (default)
+    module = service.get_module(
         repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
         ref="main",
         path=".",
-        output_dir=sample_output_dir,
     )
 
     assert module is not None
@@ -475,14 +476,25 @@ def test_mcp_get_module_details_tool(sample_output_dir):
     )
     assert module["ref"] == "main"
 
-    # Verify complete structure
+    # Verify complete structure (excluding readme by default)
     assert "path" in module
     assert "description" in module
     assert "variables" in module
     assert "outputs" in module
     assert "providers" in module
     assert "modules" in module
-    assert "readme_content" in module
+    assert "readme_content" not in module
+
+    # Test retrieving a module with readme included
+    module_with_readme = service.get_module(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="main",
+        path=".",
+        include_readme=True,
+    )
+
+    assert module_with_readme is not None
+    assert "readme_content" in module_with_readme
 
 
 def test_mcp_get_module_details_tool_not_found(sample_output_dir):

@@ -1,0 +1,35 @@
+# TicketsToHeaven Terraform Configuration - Example tfvars
+
+# AWS Configuration
+aws_region = "us-east-2"
+
+# Project Configuration
+project_name = "ticketstoheaven"
+environment  = "prod"
+
+# Domain Configuration
+domain_name = "ticketstoheaven.com"  # Update with your actual domain
+
+# Lambda Configuration
+lambda_memory_size = 512
+lambda_timeout     = 30
+
+# DynamoDB Configuration
+dynamodb_billing_mode = "PAY_PER_REQUEST"
+
+# Logging Configuration
+enable_cloudwatch_logging = true
+log_retention_days        = 7
+
+# Secrets Configuration
+stripe_api_key_secret_name           = "ticketstoheaven/stripe-api-key"
+third_party_api_key_secret_name      = "ticketstoheaven/third-party-api-key"
+third_party_api_endpoint_param_name  = "/ticketstoheaven/third-party-api-endpoint"
+
+# Additional Tags
+tags = {
+  Team        = "Platform"
+  CostCenter  = "Engineering"
+  Owner       = "DevOps"
+  BackupPolicy = "daily"
+}

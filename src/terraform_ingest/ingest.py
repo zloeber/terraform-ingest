@@ -1,5 +1,6 @@
 """Main ingestion logic for processing terraform repositories."""
 
+import os
 import json
 from pathlib import Path
 from typing import Any, List, Optional
@@ -56,6 +57,9 @@ class TerraformIngest:
         Returns:
             List of TerraformModuleSummary instances for all processed modules
         """
+        os.environ["TOKENIZERS_PARALLELISM"] = "true"
+        
+        
         all_summaries = []
 
         for repo_config in self.config.repositories:

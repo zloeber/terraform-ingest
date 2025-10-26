@@ -256,6 +256,7 @@ class ModuleQueryService:
         repository: str,
         ref: str,
         path: str = ".",
+        include_readme: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Retrieve full details for a specific Terraform module.
 
@@ -263,6 +264,7 @@ class ModuleQueryService:
             repository: Git repository URL
             ref: Branch or tag name
             path: Path within the repository (default: "." for root)
+            include_readme: Whether to include the readme_content in the response (default: False)
 
         Returns:
             Complete module summary dictionary, or None if not found
@@ -275,6 +277,11 @@ class ModuleQueryService:
                 and summary.get("ref") == ref
                 and summary.get("path") == path
             ):
+                # Remove readme_content if not requested
+                if not include_readme and "readme_content" in summary:
+                    summary_copy = summary.copy()
+                    del summary_copy["readme_content"]
+                    return summary_copy
                 return summary
 
         return None
@@ -604,7 +611,7 @@ def search_modules(
 def get_module_details(
     repository: str,
     ref: str,
-    path: str = ".",
+    path: str,
     output_dir: str = "./output",
 ) -> Optional[Dict[str, Any]]:
     """Retrieves full details for a specific ingested Terraform module.

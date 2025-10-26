@@ -520,6 +520,231 @@ def mcp(config, transport, host, port, ingest_on_startup):
         click.echo("\nMCP server stopped")
 
 
+@cli.group()
+def function():
+    """Manage MCP functions and operations.
+
+    This group provides commands to interact with MCP (Model Context Protocol)
+    functions, including showing available functions and executing them.
+
+    Example:
+
+        terraform-ingest function show
+
+        terraform-ingest function exec my-function --arg value
+    """
+    pass
+
+
+@function.command()
+@click.option(
+    "--output-dir",
+    "-o",
+    default="./output",
+    help="Directory containing ingested module summaries",
+)
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["table", "json", "list"]),
+    default="table",
+    help="Output format for function list",
+)
+def show(output_dir, format):
+    """Show available MCP functions and their details.
+
+    This command displays information about all available MCP functions
+    that can be executed against ingested Terraform modules.
+
+    Example:
+
+        terraform-ingest function show
+
+        terraform-ingest function show --output-dir ./my-output --format json
+    """
+    try:
+        # Import the MCP instance to get exposed functions
+        from terraform_ingest.mcp_service import mcp
+
+        # Dynamically detect exposed MCP functions from the tool manager
+        functions = []
+        if hasattr(mcp, "_tool_manager") and hasattr(mcp._tool_manager, "_tools"):
+            tools_dict = mcp._tool_manager._tools
+            for tool_name, tool in tools_dict.items():
+                # Extract function information from the tool
+                func_info = {
+                    "name": tool_name,
+                    "description": tool.description or "No description available",
+                    "parameters": [],
+                }
+
+                # Extract parameters from tool's parameter schema
+                if hasattr(tool, "parameters") and tool.parameters:
+                    params_schema = tool.parameters
+                    if isinstance(params_schema, dict) and "properties" in params_schema:
+                        func_info["parameters"] = list(
+                            params_schema["properties"].keys()
+                        )
+
+                functions.append(func_info)
+
+        # Sort functions by name for consistent output
+        functions.sort(key=lambda x: x["name"])
+
+        if format == "json":
+            click.echo(json.dumps(functions, indent=2))
+        elif format == "list":
+            if functions:
+                for func in functions:
+                    click.echo(f"• {func['name']}")
+            else:
+                click.echo("No MCP functions found")
+        else:  # table format
+            if functions:
+                click.echo("Available MCP Functions:")
+                click.echo("-" * 80)
+                for func in functions:
+                    click.echo(f"\nFunction: {func['name']}")
+                    click.echo(f"Description: {func['description']}")
+                    if func["parameters"]:
+                        click.echo(f"Parameters: {', '.join(func['parameters'])}")
+                    else:
+                        click.echo("Parameters: (none)")
+            else:
+                click.echo("No MCP functions found")
+
+    except Exception as e:
+        click.echo(f"Error showing functions: {e}", err=True)
+        raise click.Abort()
+
+
+@function.command()
+@click.argument("function_name")
+@click.option(
+    "--arg",
+    "-a",
+    multiple=True,
+    nargs=2,
+    help="Function arguments as key-value pairs (use multiple times for multiple args)",
+)
+@click.option(
+    "--output-dir",
+    "-o",
+    default="./output",
+    help="Directory containing ingested module summaries",
+)
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["json", "text"]),
+    default="json",
+    help="Output format for function results",
+)
+def exec(function_name, arg, output_dir, format):
+    """Execute an MCP function.
+
+    FUNCTION_NAME: Name of the function to execute.
+
+    This command executes a specific MCP function with the provided arguments
+    and returns the results.
+
+    Example:
+
+        terraform-ingest function exec list_modules
+
+        terraform-ingest function exec search_modules -a query "aws vpc" -a provider "aws"
+
+        terraform-ingest function exec get_module_details -a repository "https://github.com/..." -a ref "main"
+    """
+    try:
+        # Convert arguments to dictionary
+        args_dict = {}
+        for key, value in arg:
+            args_dict[key] = value
+
+        # Add output_dir to arguments if not already present
+        if "output_dir" not in args_dict and function_name != "search_modules_vector":
+            args_dict["output_dir"] = output_dir
+
+        #click.echo(f"Executing function: {function_name}")
+        #click.echo(f"Arguments: {args_dict}")
+
+        # Import the ModuleQueryService
+        from terraform_ingest.mcp_service import ModuleQueryService, MCPContext
+
+        # Map function names to methods
+        if function_name == "search_modules_vector":
+            # This function needs the MCPContext for vector DB access
+            ctx = MCPContext.get_instance()
+            if not ctx.ingester or not ctx.ingester.vector_db:
+                click.echo("Error: Vector database is not enabled", err=True)
+                raise click.Abort()
+            result = ctx.ingester.search_vector_db(
+                args_dict.get("query", ""),
+                filters={
+                    k: v
+                    for k, v in args_dict.items()
+                    if k in ["provider", "repository"]
+                },
+                n_results=int(args_dict.get("limit", 10)),
+            )
+        else:
+            # Use ModuleQueryService for other functions
+            service = ModuleQueryService(
+                output_dir=args_dict.get("output_dir", "./output")
+            )
+
+            if function_name == "list_repositories":
+                result = service.list_repositories(
+                    filter_keyword=args_dict.get("filter"),
+                    limit=int(args_dict.get("limit", 50)),
+                )
+            elif function_name == "search_modules":
+                repo_urls = None
+                if "repo_urls" in args_dict:
+                    # Handle comma-separated or list-style repo URLs
+                    repo_urls = (
+                        args_dict["repo_urls"].split(",")
+                        if isinstance(args_dict["repo_urls"], str)
+                        else args_dict["repo_urls"]
+                    )
+                result = service.search_modules(
+                    query=args_dict.get("query", ""),
+                    repo_urls=repo_urls,
+                    provider=args_dict.get("provider"),
+                )
+            elif function_name == "get_module_details":
+                # Parse 'all' argument as boolean (default: False)
+                include_readme = args_dict.get("all", "false").lower() in ("true", "1", "yes")
+                result = service.get_module(
+                    repository=args_dict.get("repository", ""),
+                    ref=args_dict.get("ref", ""),
+                    path=args_dict.get("path", "."),
+                    include_readme=include_readme,
+                )
+            elif function_name == "list_modules":
+                result = service.list_modules(limit=int(args_dict.get("limit", 100)))
+            elif function_name == "list_module_resources":
+                result = service.list_module_resources(
+                    repository=args_dict.get("repository", ""),
+                    ref=args_dict.get("ref", ""),
+                    path=args_dict.get("path", "."),
+                )
+            else:
+                click.echo(f"Error: Unknown function '{function_name}'", err=True)
+                raise click.Abort()
+
+        # Output the result
+        if format == "json":
+            click.echo(json.dumps(result, indent=2, default=str))
+        else:  # text format
+            click.echo(json.dumps(result, indent=2, default=str))
+
+    except Exception as e:
+        click.echo(f"Error executing function '{function_name}': {e}", err=True)
+        raise click.Abort()
+
+
 def main():
     """Entry point for the CLI."""
     cli()

@@ -81,14 +81,13 @@ uv run terraform-ingest search "vpc module for aws"
 For semantic search with ChromaDB embeddings:
 
 ```bash
-# Using pip
-pip install chromadb sentence-transformers
+uv add chromadb sentence-transformers
 
 # Or for all embedding options (OpenAI, Claude/Voyage)
-pip install chromadb sentence-transformers openai voyageai
+uv add chromadb sentence-transformers openai voyageai
 ```
 
-See [Vector Database Embeddings](docs/vector_database_embeddings_FEATURE.md) for detailed setup instructions.
+See [Vector Database Embeddings](docs/embeddings.md) for detailed setup instructions.
 
 ## Usage
 
