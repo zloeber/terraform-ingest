@@ -14,6 +14,7 @@ from terraform_ingest import __version__, CONFIG_PATH
 from terraform_ingest.mcp_service import start as mcp_main
 from terraform_ingest.mcp_service import _get_module_resource_impl
 
+
 @click.group()
 @click.version_option(version=__version__)
 def cli():
@@ -581,7 +582,10 @@ def show(output_dir, format):
                 # Extract parameters from tool's parameter schema
                 if hasattr(tool, "parameters") and tool.parameters:
                     params_schema = tool.parameters
-                    if isinstance(params_schema, dict) and "properties" in params_schema:
+                    if (
+                        isinstance(params_schema, dict)
+                        and "properties" in params_schema
+                    ):
                         func_info["parameters"] = list(
                             params_schema["properties"].keys()
                         )
@@ -730,8 +734,8 @@ def exec(function_name, arg, output_dir, format):
         if "output_dir" not in args_dict and function_name != "search_modules_vector":
             args_dict["output_dir"] = output_dir
 
-        #click.echo(f"Executing function: {function_name}")
-        #click.echo(f"Arguments: {args_dict}")
+        # click.echo(f"Executing function: {function_name}")
+        # click.echo(f"Arguments: {args_dict}")
 
         # Import the ModuleQueryService
         from terraform_ingest.mcp_service import ModuleQueryService, MCPContext
@@ -779,7 +783,11 @@ def exec(function_name, arg, output_dir, format):
                 )
             elif function_name == "get_module_details":
                 # Parse 'all' argument as boolean (default: False)
-                include_readme = args_dict.get("all", "false").lower() in ("true", "1", "yes")
+                include_readme = args_dict.get("all", "false").lower() in (
+                    "true",
+                    "1",
+                    "yes",
+                )
                 result = service.get_module(
                     repository=args_dict.get("repository", ""),
                     ref=args_dict.get("ref", ""),

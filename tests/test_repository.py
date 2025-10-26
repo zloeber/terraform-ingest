@@ -1,7 +1,6 @@
 """Tests for repository management functionality."""
 
-import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 from terraform_ingest.repository import RepositoryManager
 
 

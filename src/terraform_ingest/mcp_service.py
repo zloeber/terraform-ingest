@@ -6,7 +6,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-from fastmcp import FastMCP, Context
+from fastmcp import FastMCP
 
 from terraform_ingest.models import IngestConfig
 from terraform_ingest.ingest import TerraformIngest
@@ -1151,16 +1151,11 @@ Create documentation with the following sections:
 
 
 # Prompts for AI agents
-@mcp.prompt(
-    title="Find Best Terraform Module"
-)
-def find_best_terraform_module_prompt(
-    keywords: str,
-    provider: str
-) -> str:
+@mcp.prompt(title="Find Best Terraform Module")
+def find_best_terraform_module_prompt(keywords: str, provider: str) -> str:
     """Generate a prompt to help find a Terraform module.
     This prompt guides users in searching for relevant Terraform modules
-    based on their requirements. 
+    based on their requirements.
 
     Args:
         keywords: Keywords describing the desired Terraform module
@@ -1173,14 +1168,13 @@ def find_best_terraform_module_prompt(
     #     search_tool = "search_modules_vector"
     # else:
     #     search_tool = "search_modules"
-    return (
-        f"""Use the search_modules_vector tool to find the top 5 Terraform modules related to the following query: {keywords}
+    return f"""Use the search_modules_vector tool to find the top 5 Terraform modules related to the following query: {keywords}
 for the {provider} provider. For each module. use the get_module_details tool to retrieve detailed information
 about the module, including its variables, outputs, providers, and README content.
 Summarize the key features of each module and determine the best fit for the user's requirements if any are found.
 Return the module repository URL, ref, path, and a brief summary of why it is a good fit.
 """
-    )
+
 
 @mcp.prompt(title="Terraform Best Practices")
 def terraform_best_practices(

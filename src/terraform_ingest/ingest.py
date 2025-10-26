@@ -58,8 +58,7 @@ class TerraformIngest:
             List of TerraformModuleSummary instances for all processed modules
         """
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
-        
-        
+
         all_summaries = []
 
         for repo_config in self.config.repositories:
