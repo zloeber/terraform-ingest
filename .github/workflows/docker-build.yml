@@ -16,9 +16,9 @@ jobs:
       contents: read
       packages: write
 
-    strategy:
-      matrix:
-        target: [cli, mcp, dev]
+    # strategy:
+    #   matrix:
+    #     target: [cli, mcp, dev]
 
     steps:
       - name: Checkout repository
@@ -56,8 +56,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
-            type=raw,value=${{ matrix.target }}
-            type=raw,value=${{ matrix.target }}-latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
 
       # Build for all target platforms and push if on a tag and not a pull request
       - name: Build and push Docker image
@@ -66,13 +65,12 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          target: ${{ matrix.target }}
           push: ${{ github.event_name != 'pull_request' && github.ref_type == 'tag' }}
           sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ github.ref_name }}-${{ matrix.target }}
-          cache-to: type=gha,scope=${{ github.ref_name }}-${{ matrix.target }},mode=max
+          cache-from: type=gha,scope=${{ github.ref_name }}
+          cache-to: type=gha,scope=${{ github.ref_name }},mode=max
           # cache-from: type=gha
           # cache-to: type=gha,mode=max
           build-args: DEPLOY_VERSION=${{ steps.version.outputs.version }}
@@ -108,34 +106,22 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
-          target: ${{ matrix.target }}
           load: true
-          tags: terraform-ingest:test-${{ matrix.target }}
+          tags: terraform-ingest:test
 
-      - name: Test CLI image
-        if: matrix.target == 'cli'
+      - name: Test Image
         run: |
           docker run --rm terraform-ingest:test-cli --help
           docker run --rm terraform-ingest:test-cli --version
-
-      # - name: Test API image
-      #   if: matrix.target == 'api'
-      #   run: |
-      #     docker run --rm terraform-ingest:test-api --help 2>&1 | grep -q "uvicorn"
-
-      - name: Test MCP image
-        if: matrix.target == 'mcp'
-        run: |
-          timeout 5 docker run --rm terraform-ingest:test-mcp || true
 
   security-scan:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name != 'pull_request'
 
-    strategy:
-      matrix:
-        target: [cli, mcp]
+    # strategy:
+    #   matrix:
+    #     target: [cli, mcp]
 
     steps:
       - name: Checkout repository
@@ -148,19 +134,18 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
-          target: ${{ matrix.target }}
           load: true
-          tags: terraform-ingest:scan-${{ matrix.target }}
+          tags: terraform-ingest:scan
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: terraform-ingest:scan-${{ matrix.target }}
+          image-ref: terraform-ingest:scan
           format: 'sarif'
-          output: 'trivy-results-${{ matrix.target }}.sarif'
+          output: 'trivy-results.sarif'
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@17783bfb99b07f70fae080b654aed0c514057477 # codeql-bundle-v2.23.3
         if: always()
         with:
-          sarif_file: 'trivy-results-${{ matrix.target }}.sarif'
+          sarif_file: 'trivy-results.sarif'
