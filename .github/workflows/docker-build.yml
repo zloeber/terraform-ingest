@@ -68,10 +68,13 @@ jobs:
           platforms: linux/amd64,linux/arm64
           target: ${{ matrix.target }}
           push: ${{ github.event_name != 'pull_request' && github.ref_type == 'tag' }}
+          sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
+          cache-from: type=gha,scope=${{ github.ref_name }}-${{ matrix.target }}
+          cache-to: type=gha,scope=${{ github.ref_name }}-${{ matrix.target }},mode=max
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max
           build-args: DEPLOY_VERSION=${{ steps.version.outputs.version }}
     
       - name: Generate artifact attestation
