@@ -18,7 +18,7 @@ jobs:
 
     strategy:
       matrix:
-        target: [cli, api, mcp, dev]
+        target: [cli, mcp, dev]
 
     steps:
       - name: Checkout repository
@@ -70,8 +70,8 @@ jobs:
           push: ${{ github.event_name != 'pull_request' && github.ref_type == 'tag' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          #cache-from: type=gha
-          #cache-to: type=gha,mode=min
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
           build-args: DEPLOY_VERSION=${{ steps.version.outputs.version }}
     
       - name: Generate artifact attestation
@@ -92,7 +92,7 @@ jobs:
 
     strategy:
       matrix:
-        target: [cli, api, mcp]
+        target: [cli, mcp]
 
     steps:
       - name: Checkout repository
@@ -115,10 +115,10 @@ jobs:
           docker run --rm terraform-ingest:test-cli --help
           docker run --rm terraform-ingest:test-cli --version
 
-      - name: Test API image
-        if: matrix.target == 'api'
-        run: |
-          docker run --rm terraform-ingest:test-api --help 2>&1 | grep -q "uvicorn"
+      # - name: Test API image
+      #   if: matrix.target == 'api'
+      #   run: |
+      #     docker run --rm terraform-ingest:test-api --help 2>&1 | grep -q "uvicorn"
 
       - name: Test MCP image
         if: matrix.target == 'mcp'
@@ -132,7 +132,7 @@ jobs:
 
     strategy:
       matrix:
-        target: [cli, api, mcp]
+        target: [cli, mcp]
 
     steps:
       - name: Checkout repository
