@@ -66,65 +66,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import sys; sys.exit(0)" || exit 1
 
 # ============================================================================
-# Stage 3: CLI Mode
-# ============================================================================
-FROM runtime-base AS cli
-
-LABEL mode="cli" \
-      description="CLI mode - run terraform-ingest commands"
-
-# Default command for CLI mode
-ENTRYPOINT ["terraform-ingest"]
-CMD ["--help"]
-
-# ============================================================================
-# Stage 4: API Mode
-# ============================================================================
-FROM runtime-base AS api
-
-LABEL mode="api" \
-      description="API mode - FastAPI REST service on port 8000"
-
-# Expose API port
-EXPOSE 8000
-
-# Health check for API
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5.0).raise_for_status()" || exit 1
-
-# Environment variables for API
-ENV UVICORN_HOST=0.0.0.0 \
-    UVICORN_PORT=8000 \
-    UVICORN_LOG_LEVEL=info
-
-# Default command for API mode
-ENTRYPOINT ["python", "-m", "uvicorn"]
-CMD ["terraform_ingest.api:app", "--host", "0.0.0.0", "--port", "8000"]
-
-# ============================================================================
-# Stage 5: MCP Server Mode
-# ============================================================================
-FROM runtime-base AS mcp
-
-LABEL mode="mcp" \
-      description="MCP mode - FastMCP server for AI agent access"
-
-# MCP typically uses stdio for communication
-# Health check is minimal AS MCP runs in stdio mode
-HEALTHCHECK --interval=60s --timeout=10s --start-period=5s --retries=2 \
-    CMD ps aux | grep -q "terraform-ingest-mcp" || exit 1
-
-# Environment variables for MCP
-ENV TERRAFORM_INGEST_MCP_AUTO_INGEST=true \
-    TERRAFORM_INGEST_MCP_INGEST_ON_STARTUP=false \
-    TERRAFORM_INGEST_MCP_REFRESH_INTERVAL_HOURS=24
-
-# Default command for MCP mode
-ENTRYPOINT ["terraform-ingest-mcp"]
-CMD []
-
-# ============================================================================
-# Stage 6: Development Mode (optional)
+# Stage 3: Development Mode (optional)
 # ============================================================================
 FROM runtime-base AS dev
 
@@ -155,3 +97,33 @@ COPY src/ /app/src/
 # Default to bash for interactive development
 ENTRYPOINT ["/bin/bash"]
 CMD ["-i"]
+
+# ============================================================================
+# Stage 4: CLI, API, and MCP Modes (Multi-Purpose)
+# ============================================================================
+FROM runtime-base AS app
+
+LABEL mode="app" \
+      description="Multi-purpose mode supporting CLI, API, and MCP execution"
+
+# Expose API port (used when running in API mode)
+EXPOSE 8000
+
+# Health check for API mode
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5.0).raise_for_status()" || exit 1
+
+# Environment variables for API mode
+ENV UVICORN_HOST=0.0.0.0 \
+    UVICORN_PORT=8000 \
+    UVICORN_LOG_LEVEL=info \
+    TERRAFORM_INGEST_MCP_AUTO_INGEST=true \
+    TERRAFORM_INGEST_MCP_INGEST_ON_STARTUP=false \
+    TERRAFORM_INGEST_MCP_REFRESH_INTERVAL_HOURS=24
+
+# Default command for CLI mode (can be overridden for API or MCP modes)
+# - CLI: terraform-ingest ingest config.yaml
+# - API: python -m uvicorn terraform_ingest.api:app --host 0.0.0.0 --port 8000
+# - MCP: terraform-ingest-mcp
+ENTRYPOINT ["terraform-ingest"]
+CMD ["--help"]

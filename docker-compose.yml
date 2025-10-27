@@ -8,7 +8,7 @@ services:
   terraform-ingest-cli:
     build:
       context: .
-      target: cli
+      target: app
     container_name: terraform-ingest-cli
     volumes:
       - ./config.yaml:/app/config/config.yaml:ro
@@ -21,6 +21,9 @@ services:
       - cli
     stdin_open: true
     tty: true
+    # Default CLI command (can be overridden)
+    entrypoint: terraform-ingest
+    command: ["--help"]
 
   # ============================================================================
   # API Mode Example
@@ -30,7 +33,7 @@ services:
   terraform-ingest-api:
     build:
       context: .
-      target: api
+      target: app
     container_name: terraform-ingest-api
     ports:
       - "8000:8000"
@@ -54,6 +57,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 5s
+    # Override for API mode
+    entrypoint: python
+    command: ["-m", "uvicorn", "terraform_ingest.api:app", "--host", "0.0.0.0", "--port", "8000"]
 
   # ============================================================================
   # MCP Server Mode Example
@@ -62,7 +68,7 @@ services:
   terraform-ingest-mcp:
     build:
       context: .
-      target: mcp
+      target: app
     container_name: terraform-ingest-mcp
     volumes:
       - ./config.yaml:/app/config/config.yaml:ro
@@ -80,6 +86,9 @@ services:
     # Stdin/stdout for MCP protocol communication
     stdin_open: true
     tty: true
+    # Override for MCP mode
+    entrypoint: terraform-ingest-mcp
+    command: []
 
   # ============================================================================
   # Development Mode Example
@@ -102,8 +111,3 @@ services:
       - dev
     stdin_open: true
     tty: true
-
-# Define named volumes for shared data
-volumes:
-  terraform-output:
-  terraform-repos:
