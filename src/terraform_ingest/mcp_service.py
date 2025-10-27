@@ -506,7 +506,7 @@ def set_mcp_context(
         vector_db_enabled: Whether vector database is enabled
         stdio_mode: Whether running in stdio mode (suppresses output)
     """
-    # global _service
+    global _service
 
     MCPContext.set(ingester, config, vector_db_enabled, stdio_mode)
 
