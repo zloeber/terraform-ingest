@@ -69,8 +69,8 @@ jobs:
           sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ github.ref }}
-          cache-to: type=gha,scope=${{ github.ref }},mode=min
+          cache-from: type=inline,scope=${{ github.ref }}
+          cache-to: type=inline,scope=${{ github.ref }},mode=min
           build-args: DEPLOY_VERSION=${{ steps.version.outputs.version }}
     
       - name: Generate artifact attestation
@@ -126,8 +126,8 @@ jobs:
           context: .
           load: true
           tags: terraform-ingest:scan
-          cache-from: type=gha,scope=${{ github.ref }}
-          cache-to: type=gha,scope=${{ github.ref }},mode=min
+          cache-from: type=inline,scope=${{ github.ref }}
+          cache-to: type=inline,scope=${{ github.ref }},mode=min
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
