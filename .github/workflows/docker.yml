@@ -1,6 +1,10 @@
 name: Build and Push Docker Images
 run-name: Docker Build and Push - ${{ github.ref_name }}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
   workflow_dispatch:
