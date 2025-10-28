@@ -76,31 +76,6 @@ jobs:
           cache-from: type=inline,scope=${{ github.ref }}
           cache-to: type=inline,scope=${{ github.ref }},mode=min
           build-args: DEPLOY_VERSION=${{ steps.version.outputs.version }}
-
-      # Build single-platform image for security scanning
-      - name: Build image for scanning
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-        if: github.event_name != 'pull_request'
-        with:
-          context: .
-          load: true
-          tags: terraform-ingest:scan
-          cache-from: type=inline,scope=${{ github.ref }}
-          build-args: DEPLOY_VERSION=${{ steps.version.outputs.version }}
-
-      - name: Run Trivy vulnerability scanner
-        if: github.event_name != 'pull_request'
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: terraform-ingest:scan
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy results to GitHub Security tab
-        if: always() && github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@17783bfb99b07f70fae080b654aed0c514057477 # codeql-bundle-v2.23.3
-        with:
-          sarif_file: 'trivy-results.sarif'
     
       - name: Generate artifact attestation
         if: github.event_name != 'pull_request' && github.ref_type == 'tag'
