@@ -5,7 +5,7 @@ A FastAPI/Click-based Python application that ingests multiple Terraform reposit
 
 ## Rules
 - Before running any command, check the current terminal context and use that same terminal ID for all subsequent commands.
-- All documentation created to meet a specific feature request must be created in the ./docs folder with a filename that matches the feature request title in snake_case and ends with _FEATURE.md. For example, a feature request titled "Add User Authentication" would have documentation created in ./docs/add_user_authentication_FEATURE.md.
+- All documentation created must be created in the ./docs folder.
 - Do not run multiple line python commands in a single execution, instead create temporary scripts if needed and run them as single commands.
 - **Always run tests and linting** before committing changes to ensure code quality.
 - Use `uv` package manager instead of `pip` for dependency management.

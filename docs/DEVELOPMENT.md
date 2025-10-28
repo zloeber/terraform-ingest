@@ -4,4 +4,14 @@ I use [task](https://taskfile.dev) along with [mise](https://mise.jdx.dev) for e
 
 ## Building
 
-This project uses uv + hatch + hatch-vcs for building and automatic versioning. You can build the local docker image using `task build:image` if that's your thing. 
+This project uses uv + hatch + hatch-vcs for building and automatic versioning. You can build the local docker image using `task build:image` if that's your thing.
+
+## Pre-Pull Request
+
+Before submitting a pull request run the following and clean any errors that come up:
+
+```bash
+task format
+task lint:fix
+task test
+```

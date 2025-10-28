@@ -88,7 +88,7 @@ async def health():
 
 
 @app.post("/ingest", response_model=IngestResponse)
-async def ingest_repositories(request: IngestRequest):
+async def ingest_repositories(request: IngestRequest, auto_install_deps: bool = True):
     """Ingest multiple terraform repositories.
 
     This endpoint accepts a list of repository configurations and processes
@@ -96,6 +96,7 @@ async def ingest_repositories(request: IngestRequest):
 
     Args:
         request: IngestRequest containing repository configurations
+        auto_install_deps: Whether to automatically install missing dependencies
 
     Returns:
         IngestResponse with summaries and metadata
@@ -112,7 +113,7 @@ async def ingest_repositories(request: IngestRequest):
                 clone_dir=clone_dir,
             )
 
-            ingester = TerraformIngest(config)
+            ingester = TerraformIngest(config, auto_install_deps=auto_install_deps)
             summaries = ingester.ingest()
 
             return IngestResponse(
@@ -126,7 +127,7 @@ async def ingest_repositories(request: IngestRequest):
 
 
 @app.post("/analyze", response_model=IngestResponse)
-async def analyze_repository(request: AnalyzeRequest):
+async def analyze_repository(request: AnalyzeRequest, auto_install_deps: bool = True):
     """Analyze a single terraform repository.
 
     This endpoint accepts a repository URL and configuration, then analyzes
@@ -134,6 +135,7 @@ async def analyze_repository(request: AnalyzeRequest):
 
     Args:
         request: AnalyzeRequest with repository URL and configuration
+        auto_install_deps: Whether to automatically install missing dependencies
 
     Returns:
         IngestResponse with summaries and metadata
@@ -155,7 +157,7 @@ async def analyze_repository(request: AnalyzeRequest):
                 clone_dir=f"{temp_dir}/repos",
             )
 
-            ingester = TerraformIngest(config)
+            ingester = TerraformIngest(config, auto_install_deps=auto_install_deps)
             summaries = ingester.ingest()
 
             return IngestResponse(
@@ -169,7 +171,7 @@ async def analyze_repository(request: AnalyzeRequest):
 
 
 @app.post("/ingest-from-yaml")
-async def ingest_from_yaml(yaml_content: str):
+async def ingest_from_yaml(yaml_content: str, auto_install_deps: bool = True):
     """Ingest repositories from a YAML configuration string.
 
     This endpoint accepts a YAML configuration as a string and processes
@@ -177,6 +179,7 @@ async def ingest_from_yaml(yaml_content: str):
 
     Args:
         yaml_content: YAML configuration as a string
+        auto_install_deps: Whether to automatically install missing dependencies
 
     Returns:
         IngestResponse with summaries and metadata
@@ -193,7 +196,7 @@ async def ingest_from_yaml(yaml_content: str):
                 config_dict["clone_dir"] = f"{temp_dir}/repos"
 
             config = IngestConfig(**config_dict)
-            ingester = TerraformIngest(config)
+            ingester = TerraformIngest(config, auto_install_deps=auto_install_deps)
             summaries = ingester.ingest()
 
             return IngestResponse(

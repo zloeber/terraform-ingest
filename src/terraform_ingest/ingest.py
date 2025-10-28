@@ -9,23 +9,38 @@ from terraform_ingest.models import IngestConfig, TerraformModuleSummary
 from terraform_ingest.repository import RepositoryManager
 from terraform_ingest.embeddings import VectorDBManager
 from terraform_ingest.logging import get_logger
+from terraform_ingest.dependency_installer import ensure_embeddings_available
 
 
 class TerraformIngest:
     """Main class for ingesting terraform repositories."""
 
-    def __init__(self, config: IngestConfig, logger: Optional[Any] = None):
+    def __init__(
+        self,
+        config: IngestConfig,
+        logger: Optional[Any] = None,
+        auto_install_deps: bool = True,
+    ):
         """Initialize the ingestion process.
 
         Args:
             config: IngestConfig instance with repository and embedding settings
             logger: Optional logger instance. Defaults to get_logger() if not provided.
+            auto_install_deps: Whether to automatically install missing embedding dependencies
         """
         self.config = config
         self.logger = logger or get_logger(__name__)
         self.repo_manager = RepositoryManager(config.clone_dir, logger=self.logger)
         self.output_dir = Path(config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Ensure embedding dependencies are available if embeddings are enabled
+        if config.embedding and config.embedding.enabled:
+            ensure_embeddings_available(
+                config.embedding,
+                logger=self.logger,
+                auto_install=auto_install_deps,
+            )
 
         # Initialize vector database manager if enabled
         self.vector_db = None
@@ -34,13 +49,17 @@ class TerraformIngest:
 
     @classmethod
     def from_yaml(
-        cls, yaml_path: str, logger: Optional[Any] = None
+        cls,
+        yaml_path: str,
+        logger: Optional[Any] = None,
+        auto_install_deps: bool = True,
     ) -> "TerraformIngest":
         """Create an instance from a YAML configuration file.
 
         Args:
             yaml_path: Path to the YAML configuration file
             logger: Optional logger instance
+            auto_install_deps: Whether to automatically install missing embedding dependencies
 
         Returns:
             TerraformIngest instance
@@ -49,7 +68,7 @@ class TerraformIngest:
             config_dict = yaml.safe_load(f)
 
         config = IngestConfig(**config_dict)
-        return cls(config, logger=logger)
+        return cls(config, logger=logger, auto_install_deps=auto_install_deps)
 
     def ingest(self) -> List[TerraformModuleSummary]:
         """Process all repositories and generate summaries.

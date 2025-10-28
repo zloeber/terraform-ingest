@@ -1,0 +1,234 @@
+"""Automatic dependency installer for optional features."""
+
+import subprocess
+import sys
+from typing import List
+from loguru import logger as default_logger
+
+
+class DependencyInstaller:
+    """Handles automatic installation of optional dependencies."""
+
+    # Mapping of strategies to their required packages
+    STRATEGY_PACKAGES = {
+        "sentence-transformers": ["sentence-transformers"],
+        "openai": ["openai"],
+        "claude": ["voyageai"],  # Claude uses Voyage AI for embeddings
+        "chromadb-default": ["chromadb"],
+    }
+
+    # Packages needed for vector DB support
+    EMBEDDING_PACKAGES = ["chromadb", "sentence-transformers", "openai", "voyageai"]
+
+    @staticmethod
+    def check_package_installed(package_name: str) -> bool:
+        """Check if a package is installed.
+
+        Args:
+            package_name: Name of the package to check
+
+        Returns:
+            True if package is installed, False otherwise
+        """
+        try:
+            __import__(package_name.replace("-", "_"))
+            return True
+        except ImportError:
+            return False
+
+    @staticmethod
+    def get_missing_packages(packages: List[str]) -> List[str]:
+        """Get list of packages that are not installed.
+
+        Args:
+            packages: List of package names to check
+
+        Returns:
+            List of package names that are missing
+        """
+        missing = []
+        for package in packages:
+            if not DependencyInstaller.check_package_installed(package):
+                missing.append(package)
+        return missing
+
+    @staticmethod
+    def install_packages(
+        packages: List[str],
+        logger=None,
+        use_uv: bool = True,
+    ) -> bool:
+        """Install packages using pip or uv.
+
+        Args:
+            packages: List of package names to install
+            logger: Optional logger instance
+            use_uv: Whether to prefer uv package manager (if available)
+
+        Returns:
+            True if installation succeeded, False otherwise
+        """
+        if not packages:
+            return True
+
+        logger = logger or default_logger
+
+        # Check if packages are already installed
+        still_missing = DependencyInstaller.get_missing_packages(packages)
+        if not still_missing:
+            logger.info("All required packages are already installed")
+            return True
+
+        logger.info(f"Installing missing packages: {', '.join(still_missing)}")
+
+        # Try uv first if it's available
+        if use_uv:
+            try:
+                logger.debug("Using 'uv pip install' to install packages")
+                _ = subprocess.run(
+                    ["uv", "pip", "install"] + still_missing,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                logger.info("Successfully installed packages using uv")
+                return True
+            except subprocess.CalledProcessError as e:
+                logger.warning(f"Failed to install with uv: {e.stderr}")
+                logger.debug("Falling back to pip")
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                logger.debug("uv not available or timed out, falling back to pip")
+
+        # Fall back to pip (try different approaches)
+        pip_approaches = [
+            # Approach 1: pip as a module via python
+            [sys.executable, "-m", "pip", "install"] + still_missing,
+            # Approach 2: pip command directly
+            ["pip", "install"] + still_missing,
+            # Approach 3: pip3 command directly
+            ["pip3", "install"] + still_missing,
+        ]
+
+        for pip_cmd in pip_approaches:
+            try:
+                logger.debug(f"Trying: {' '.join(pip_cmd)}")
+                _ = subprocess.run(
+                    pip_cmd,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                logger.info("Successfully installed packages using pip")
+                return True
+            except subprocess.CalledProcessError as e:
+                logger.debug(f"Failed: {e.stderr}")
+                continue
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                logger.debug(f"Command not available: {pip_cmd[0]}")
+                continue
+            except Exception as e:
+                logger.debug(f"Error with {pip_cmd[0]}: {str(e)}")
+                continue
+
+        # All approaches failed
+        logger.error(
+            f"Failed to install packages using any method.\n\n"
+            f"Please install manually with:\n"
+            f"  pip install {' '.join(still_missing)}\n"
+            f"Or with uv:\n"
+            f"  uv add {' '.join(still_missing)}\n\n"
+            f"You may also need to upgrade pip:\n"
+            f"  python -m pip install --upgrade pip"
+        )
+        return False
+
+    @staticmethod
+    def ensure_embedding_packages(
+        logger=None,
+        strategy: str = "chromadb-default",
+        auto_install: bool = True,
+    ) -> bool:
+        """Ensure all packages needed for embeddings are installed.
+
+        Args:
+            logger: Optional logger instance
+            strategy: Embedding strategy being used
+            auto_install: Whether to automatically install missing packages
+
+        Returns:
+            True if all packages are installed or successfully installed, False otherwise
+        """
+        logger = logger or default_logger
+
+        # Get packages needed for the strategy
+        if strategy not in DependencyInstaller.STRATEGY_PACKAGES:
+            logger.warning(f"Unknown embedding strategy: {strategy}")
+            return False
+
+        required_packages = DependencyInstaller.STRATEGY_PACKAGES[strategy]
+
+        # Check if we also need chromadb for the strategy
+        if strategy != "chromadb-default":
+            required_packages = list(set(required_packages + ["chromadb"]))
+
+        missing = DependencyInstaller.get_missing_packages(required_packages)
+
+        if not missing:
+            logger.debug(f"All packages for '{strategy}' strategy are installed")
+            return True
+
+        if not auto_install:
+            logger.error(
+                f"Missing packages for '{strategy}' embedding strategy: {', '.join(missing)}\n"
+                f"Install with:\n"
+                f"  pip install terraform-ingest[embeddings]\n"
+                f"Or specific packages:\n"
+                f"  pip install {' '.join(missing)}"
+            )
+            return False
+
+        logger.info(
+            f"Missing packages for '{strategy}' embedding strategy: {', '.join(missing)}"
+        )
+        return DependencyInstaller.install_packages(required_packages, logger)
+
+
+def ensure_embeddings_available(
+    embedding_config,
+    logger=None,
+    auto_install: bool = True,
+) -> bool:
+    """Convenience function to ensure embeddings are available.
+
+    Args:
+        embedding_config: EmbeddingConfig instance
+        logger: Optional logger instance
+        auto_install: Whether to automatically install missing packages
+
+    Returns:
+        True if embeddings are available or can be installed, False otherwise
+
+    Raises:
+        ImportError: If auto_install is False and packages are missing
+    """
+    logger = logger or default_logger
+
+    if not embedding_config or not embedding_config.enabled:
+        logger.debug("Embeddings not enabled in configuration")
+        return True
+
+    success = DependencyInstaller.ensure_embedding_packages(
+        logger=logger,
+        strategy=embedding_config.strategy,
+        auto_install=auto_install,
+    )
+
+    if not success and not auto_install:
+        raise ImportError(
+            f"Missing dependencies for embedding strategy '{embedding_config.strategy}'. "
+            f"Install with: pip install terraform-ingest[embeddings]"
+        )
+
+    return success

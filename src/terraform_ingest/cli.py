@@ -63,6 +63,11 @@ def cli():
     default=None,
     help="Embedding strategy to use (overrides config)",
 )
+@click.option(
+    "--auto-install-deps/--no-auto-install-deps",
+    default=True,
+    help="Automatically install missing embedding dependencies",
+)
 def ingest(
     config_file,
     output_dir,
@@ -71,6 +76,7 @@ def ingest(
     no_cache,
     enable_embeddings,
     embedding_strategy,
+    auto_install_deps,
 ):
     """Ingest terraform repositories from a YAML configuration file.
 
@@ -87,7 +93,9 @@ def ingest(
     click.echo(f"Loading configuration from {config_file}")
 
     try:
-        ingester = TerraformIngest.from_yaml(config_file)
+        ingester = TerraformIngest.from_yaml(
+            config_file, auto_install_deps=auto_install_deps
+        )
 
         # Override config if command-line options are provided
         if output_dir is not None:
@@ -120,7 +128,16 @@ def ingest(
             and ingester.config.embedding.enabled
         ):
             from terraform_ingest.embeddings import VectorDBManager
+            from terraform_ingest.dependency_installer import (
+                ensure_embeddings_available,
+            )
 
+            # Ensure dependencies for the new strategy are installed
+            ensure_embeddings_available(
+                ingester.config.embedding,
+                logger=ingester.logger,
+                auto_install=auto_install_deps,
+            )
             ingester.vector_db = VectorDBManager(ingester.config.embedding)
 
         if no_cache:

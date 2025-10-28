@@ -190,6 +190,10 @@ tasks:
         rm -rf .pytest_cache
         rm -rf .venv
         rm -rf src/terraform_ingest/_version.py
+        rm -rf chromadb
+        rm -rf ./output
+        rm -rf ./repos
+        rm -rf ./site
 
   deep:clean:
     desc: Clean the project deeply. Includes uv cache removal.
@@ -221,3 +225,4 @@ tasks:
     desc: Update GitHub Actions in workflows
     cmds:
       - npx actions-up -y
+  
