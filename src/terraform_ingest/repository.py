@@ -4,29 +4,43 @@ import fnmatch
 import os
 import shutil
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 import git
+from packaging.version import parse as parse_version, InvalidVersion
 from .models import RepositoryConfig, TerraformModuleSummary
 from .parser import TerraformParser
+from .logging import get_logger
 
 
 class RepositoryManager:
     """Manager for cloning and analyzing git repositories."""
 
-    def __init__(self, clone_dir: str = "./repos"):
-        """Initialize the repository manager."""
+    def __init__(self, clone_dir: str = "./repos", logger: Optional[Any] = None):
+        """Initialize the repository manager.
+
+        Args:
+            clone_dir: Directory to clone repositories into
+            logger: Optional logger instance. Defaults to get_logger() if not provided.
+        """
         self.clone_dir = Path(clone_dir)
         self.clone_dir.mkdir(parents=True, exist_ok=True)
+        self.logger = logger or get_logger(__name__)
 
     def process_repository(
-        self, repo_config: RepositoryConfig, silent: bool = False
+        self, repo_config: RepositoryConfig
     ) -> List[TerraformModuleSummary]:
-        """Process a repository and return summaries for all refs."""
+        """Process a repository and return summaries for all refs.
+
+        Args:
+            repo_config: RepositoryConfig instance with URL and processing options
+
+        Returns:
+            List of TerraformModuleSummary instances for all modules in the repository
+        """
         summaries = []
 
         if len(repo_config.branches) == 0 and not repo_config.include_tags:
-            if not silent:
-                print("No branches or tags specified to process.")
+            self.logger.info("No branches or tags specified to process.")
             return summaries
 
         # Determine repository name
@@ -50,12 +64,10 @@ class RepositoryManager:
                     branch,
                     repo_path,
                     repo_config.path,
-                    silent=silent,
                 )
                 summaries.extend(branch_summaries)
             except Exception as e:
-                if not silent:
-                    print(f"Error processing branch {branch}: {e}")
+                self.logger.error(f"Error processing branch {branch}: {e}")
 
         # Process tags if enabled
         if repo_config.include_tags:
@@ -68,17 +80,23 @@ class RepositoryManager:
                         tag,
                         repo_path,
                         repo_config.path,
-                        silent=silent,
                     )
                     summaries.extend(tag_summaries)
                 except Exception as e:
-                    if not silent:
-                        print(f"Error processing tag {tag}: {e}")
+                    self.logger.error(f"Error processing tag {tag}: {e}")
 
         return summaries
 
     def _clone_or_update(self, url: str, path: Path) -> git.Repo:
-        """Clone a repository or update if it already exists."""
+        """Clone a repository or update if it already exists.
+
+        Args:
+            url: Repository URL
+            path: Path to clone repository to
+
+        Returns:
+            GitPython Repo instance
+        """
         if path.exists():
             try:
                 repo = git.Repo(path)
@@ -86,11 +104,11 @@ class RepositoryManager:
                 repo.remotes.origin.fetch()
                 return repo
             except Exception as e:
-                print(f"Error updating repository, re-cloning: {e}")
+                self.logger.error(f"Error updating repository, re-cloning: {e}")
                 shutil.rmtree(path)
 
         # Clone the repository
-        print(f"Cloning repository from {url}...")
+        self.logger.info(f"Cloning repository from {url}...")
         repo = git.Repo.clone_from(url, path)
         return repo
 
@@ -101,9 +119,19 @@ class RepositoryManager:
         ref: str,
         repo_path: Path,
         module_path: str = ".",
-        silent: bool = False,
     ) -> List[TerraformModuleSummary]:
-        """Process a specific git ref (branch or tag)."""
+        """Process a specific git ref (branch or tag).
+
+        Args:
+            repo: GitPython Repo instance
+            repo_config: RepositoryConfig with processing options
+            ref: Branch or tag name to process
+            repo_path: Path to the repository
+            module_path: Path within repository to scan for modules
+
+        Returns:
+            List of TerraformModuleSummary instances
+        """
 
         summaries = []
 
@@ -118,15 +146,12 @@ class RepositoryManager:
                 # For tags, check if ref exists in tags
                 tag_names = [tag.name for tag in repo.tags]
                 if ref not in tag_names:
-                    if not silent:
-                        print(f"Ref '{ref}' does not exist in repository")
+                    self.logger.debug(f"Ref '{ref}' does not exist in repository")
                     return []
 
-            if not silent:
-                print(f"Processing ref: {ref}")
+            self.logger.info(f"Processing ref: {ref}")
         except Exception as e:
-            if not silent:
-                print(f"Error validating ref {ref}: {e}")
+            self.logger.error(f"Error validating ref {ref}: {e}")
             return summaries
         try:
             # Checkout the ref
@@ -139,19 +164,18 @@ class RepositoryManager:
 
             for mod_path in module_paths:
                 try:
-                    parser = TerraformParser(str(mod_path))
+                    parser = TerraformParser(str(mod_path), logger=self.logger)
                     # Calculate relative path from repo root
                     relative_path = str(mod_path.relative_to(repo_path))
                     summary = parser.parse_module(repo_config.url, ref, relative_path)
                     if summary:
                         summaries.append(summary)
                 except Exception as e:
-                    print(f"Error parsing module at {mod_path}: {e}")
+                    self.logger.error(f"Error parsing module at {mod_path}: {e}")
 
             return summaries
         except Exception as e:
-            if not silent:
-                print(f"Error processing ref {ref}: {e}")
+            self.logger.error(f"Error processing ref {ref}: {e}")
             return []
 
     def _find_module_paths(
@@ -161,10 +185,20 @@ class RepositoryManager:
         recursive: bool = False,
         exclude_paths: Optional[List[str]] = None,
     ) -> List[Path]:
-        """Find all terraform module paths, excluding patterns in exclude_paths."""
+        """Find all terraform module paths, excluding patterns in exclude_paths.
+
+        Args:
+            repo_path: Root path of the repository
+            module_path: Starting module path within repository
+            recursive: Whether to recursively find modules in subdirectories
+            exclude_paths: List of path patterns to exclude
+
+        Returns:
+            List of Path instances for each found module
+        """
         full_module_path = Path.joinpath(repo_path, module_path)
         if not full_module_path.exists():
-            print(f"Module path {module_path} does not exist")
+            self.logger.debug(f"Module path {module_path} does not exist")
             return []
 
         if exclude_paths is None:
@@ -174,7 +208,7 @@ class RepositoryManager:
 
         if recursive:
             # Recursively find all directories containing terraform files
-            for root, dirs, files in os.walk(full_module_path):
+            for root, _, _ in os.walk(full_module_path):
                 root_path = Path(root)
                 # Get relative path from repo root for exclusion matching
                 try:
@@ -228,23 +262,62 @@ class RepositoryManager:
         return len(tf_files) > 0
 
     def _get_tags(self, repo: git.Repo, max_tags: Optional[int] = None) -> List[str]:
-        """Get a list of tags from the repository."""
+        """Get a list of tags from the repository, sorted by semantic version.
+
+        Tags are sorted using semantic versioning (like git tag -l | sort -r -V).
+        Tags that don't parse as valid semantic versions are included at the end,
+        sorted alphabetically in reverse order.
+
+        Args:
+            repo: GitPython Repo instance
+            max_tags: Maximum number of tags to return
+
+        Returns:
+            List of tag names sorted by semantic version in descending order
+        """
         try:
-            tags = sorted(
-                repo.tags, key=lambda t: t.commit.committed_datetime, reverse=True
-            )
-            tag_names = [tag.name for tag in tags]
+            tag_names = [tag.name for tag in repo.tags]
+
+            if not tag_names:
+                return []
+
+            # Separate valid semantic versions from non-versions
+            valid_versions = []
+            non_versions = []
+
+            for tag_name in tag_names:
+                try:
+                    version = parse_version(tag_name)
+                    # Skip pre-release and dev versions if desired, or include them
+                    valid_versions.append((tag_name, version))
+                except InvalidVersion:
+                    # Tags that don't parse as versions
+                    non_versions.append(tag_name)
+
+            # Sort valid versions in descending order
+            valid_versions.sort(key=lambda x: x[1], reverse=True)
+            sorted_tag_names = [tag_name for tag_name, _ in valid_versions]
+
+            # Add non-version tags at the end, sorted reverse alphabetically
+            sorted_tag_names.extend(sorted(non_versions, reverse=True))
 
             if max_tags:
-                tag_names = tag_names[:max_tags]
+                sorted_tag_names = sorted_tag_names[:max_tags]
 
-            return tag_names
+            return sorted_tag_names
         except Exception as e:
-            print(f"Error getting tags: {e}")
+            self.logger.error(f"Error getting tags: {e}")
             return []
 
     def _get_default_branch(self, repo: git.Repo) -> Optional[str]:
-        """Get the default branch of the repository."""
+        """Get the default branch of the repository.
+
+        Args:
+            repo: GitPython Repo instance
+
+        Returns:
+            Default branch name or None
+        """
         try:
             # Try to get the default branch from origin
             if hasattr(repo.remotes.origin, "refs"):
@@ -272,7 +345,7 @@ class RepositoryManager:
 
             return None
         except Exception as e:
-            print(f"Error getting default branch: {e}")
+            self.logger.error(f"Error getting default branch: {e}")
             return None
 
     def cleanup(self):

@@ -68,9 +68,9 @@ docker-compose down
 
 ## 📖 Documentation
 
-- **[Full Guide](DOCKER_USAGE_GUIDE.md)** - Comprehensive documentation
-- **[Quick Reference](DOCKER_QUICK_REFERENCE.md)** - Common commands
-- **[Implementation Details](DOCKER_IMPLEMENTATION.md)** - How it works
+- **[Full Guide](docker_guide.md)** - Comprehensive documentation
+- **[Quick Reference](docker_quick_ref.md)** - Common commands
+- **[Implementation Details](docker_complete.md)** - How it works
 - **[Checklist](DOCKER_CHECKLIST.md)** - Verification checklist
 
 ## 🎯 Features
@@ -234,4 +234,4 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 
 **Ready to use?** Start with the Quick Start section above! 🎉
 
-For detailed information, see [DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md)
+For detailed information, see [docker_guide.md](docker_guide.md)

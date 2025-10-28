@@ -36,7 +36,7 @@ mcp:
   ingest_on_startup: true         # Run ingestion immediately on startup  
   refresh_interval_hours: 6       # Auto-refresh every 6 hours (null to disable)
   config_file: config.yaml        # Configuration file to use for auto-ingestion
-
+  
 # Vector database embedding configuration
 embedding:
   enabled: true                             # Enable embeddings

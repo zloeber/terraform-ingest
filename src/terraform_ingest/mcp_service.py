@@ -11,12 +11,80 @@ from fastmcp import FastMCP
 from terraform_ingest.models import IngestConfig
 from terraform_ingest.ingest import TerraformIngest
 
+from terraform_ingest.logging import get_mcp_logger
+
 # Initialize FastMCP server with default instructions
 # These will be updated when the config is loaded
 mcp = FastMCP(
     name="terraform-ingest",
     instructions="Service for querying ingested Terraform modules from Git repositories.",
 )
+
+# Create MCP logger with flushing capability
+mcp_logger = get_mcp_logger("terraform-ingest")
+
+# Flush logs immediately to avoid buffering issues
+mcp_logger.flush_logs()
+
+
+class MCPContext:
+    """Singleton context for MCP server configuration and state.
+
+    This class encapsulates all global state needed by the MCP server,
+    providing a clean API without polluting the global namespace with
+    individual variables.
+    """
+
+    _instance: Optional["MCPContext"] = None
+
+    def __init__(
+        self,
+        ingester: Optional[TerraformIngest] = None,
+        config: Optional[IngestConfig] = None,
+        vector_db_enabled: bool = False,
+        stdio_mode: bool = False,
+    ):
+        """Initialize the MCP context.
+
+        Args:
+            ingester: TerraformIngest instance for module operations
+            config: IngestConfig instance with server configuration
+            vector_db_enabled: Whether vector database functionality is enabled
+            stdio_mode: Whether running in stdio mode (for output suppression)
+        """
+        self.ingester = ingester
+        self.config = config
+        self.vector_db_enabled = vector_db_enabled
+        self.stdio_mode = stdio_mode
+
+    @classmethod
+    def get_instance(cls) -> "MCPContext":
+        """Get or create the singleton instance.
+
+        Returns:
+            MCPContext singleton instance
+        """
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def set(
+        cls,
+        ingester: TerraformIngest,
+        config: IngestConfig,
+        vector_db_enabled: bool,
+        stdio_mode: bool = False,
+    ) -> None:
+        """Set or reinitialize the context with new values.
+
+        Args:
+            ingester: TerraformIngest instance for module operations
+            config: IngestConfig instance with server configuration
+            vector_db_enabled: Whether vector database functionality is enabled
+            stdio_mode: Whether running in stdio mode
+        """
+        cls._instance = cls(ingester, config, vector_db_enabled, stdio_mode)
 
 
 class ModuleQueryService:
@@ -43,7 +111,7 @@ class ModuleQueryService:
                     summary = json.load(f)
                     summaries.append(summary)
             except Exception as e:
-                _log(f"Error loading {json_file}: {e}")
+                mcp_logger.error(f"Error loading {json_file}: {e}")
 
         return summaries
 
@@ -188,6 +256,7 @@ class ModuleQueryService:
         repository: str,
         ref: str,
         path: str = ".",
+        include_readme: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Retrieve full details for a specific Terraform module.
 
@@ -195,6 +264,7 @@ class ModuleQueryService:
             repository: Git repository URL
             ref: Branch or tag name
             path: Path within the repository (default: "." for root)
+            include_readme: Whether to include the readme_content in the response (default: False)
 
         Returns:
             Complete module summary dictionary, or None if not found
@@ -207,6 +277,11 @@ class ModuleQueryService:
                 and summary.get("ref") == ref
                 and summary.get("path") == path
             ):
+                # Remove readme_content if not requested
+                if not include_readme and "readme_content" in summary:
+                    summary_copy = summary.copy()
+                    del summary_copy["readme_content"]
+                    return summary_copy
                 return summary
 
         return None
@@ -410,25 +485,8 @@ class ModuleQueryService:
         return result
 
 
-# Global service instance
+# Global service instance for lazy initialization
 _service: Optional[ModuleQueryService] = None
-
-# Global context for MCP server
-_ingester: Optional[TerraformIngest] = None
-_config: Optional[IngestConfig] = None
-_vector_db_enabled: bool = False
-_stdio_mode: bool = False  # Flag to suppress output in stdio mode
-
-
-def _log(message: str) -> None:
-    """Print message only if not in stdio mode.
-
-    Args:
-        message: Message to print
-    """
-    global _stdio_mode
-    if not _stdio_mode:
-        print(message)
 
 
 def set_mcp_context(
@@ -437,7 +495,10 @@ def set_mcp_context(
     vector_db_enabled: bool,
     stdio_mode: bool = False,
 ) -> None:
-    """Set the global MCP context with server configuration.
+    """Set the MCP context with server configuration.
+
+    This function delegates to MCPContext singleton for state management
+    and initializes custom prompt overrides from the configuration.
 
     Args:
         ingester: Configured TerraformIngest instance
@@ -445,25 +506,30 @@ def set_mcp_context(
         vector_db_enabled: Whether vector database is enabled
         stdio_mode: Whether running in stdio mode (suppresses output)
     """
-    global _ingester, _config, _vector_db_enabled, _stdio_mode
-    _ingester = ingester
-    _config = config
-    _vector_db_enabled = vector_db_enabled
-    _stdio_mode = stdio_mode
+    global _service
 
-    # Conditionally register the search_modules_vector tool
+    MCPContext.set(ingester, config, vector_db_enabled, stdio_mode)
+
+    # Initialize the service with the output_dir from configuration
+    output_dir = config.output_dir if config else "./output"
+    _service = ModuleQueryService(output_dir)
+
+    # Initialize custom prompts from configuration if available
+    if config and config.mcp and config.mcp.prompts:
+        set_custom_prompts(config.mcp.prompts)
+        mcp_logger.info(
+            f"Loaded {len(config.mcp.prompts)} custom prompt overrides from configuration"
+        )
+
+    # Log vector database status
     if vector_db_enabled:
-        # Register the tool if not already registered
-        try:
-            mcp.register_tool(search_modules_vector)
-            _log("Vector database enabled - search_modules_vector tool registered")
-        except Exception as e:
-            # Tool might already be registered, which is fine
-            _log(
-                f"Vector database enabled - search_modules_vector tool (already registered or skipped: {e})"
-            )
+        mcp_logger.info(
+            "Vector database enabled - search_modules_vector tool available"
+        )
     else:
-        _log("Vector database disabled - search_modules_vector tool not registered")
+        mcp_logger.info(
+            "Vector database disabled - search_modules_vector will return error"
+        )
 
 
 def get_service(output_dir: str = "./output") -> ModuleQueryService:
@@ -545,7 +611,7 @@ def search_modules(
 def get_module_details(
     repository: str,
     ref: str,
-    path: str = ".",
+    path: str,
     output_dir: str = "./output",
 ) -> Optional[Dict[str, Any]]:
     """Retrieves full details for a specific ingested Terraform module.
@@ -663,11 +729,10 @@ def search_modules_vector(
         - document: Embedded text content
         - distance: Similarity score (lower is better)
     """
-    global _ingester
-
     try:
-        # Use the ingester from the running context
-        if not _ingester or not _ingester.vector_db:
+        # Get the ingester from the MCP context
+        ctx = MCPContext.get_instance()
+        if not ctx.ingester or not ctx.ingester.vector_db:
             return [
                 {
                     "error": "Vector database is not enabled",
@@ -683,7 +748,7 @@ def search_modules_vector(
             filters["repository"] = repository
 
         # Search
-        results = _ingester.search_vector_db(
+        results = ctx.ingester.search_vector_db(
             query, filters=filters if filters else None, n_results=limit
         )
 
@@ -693,29 +758,29 @@ def search_modules_vector(
         return [{"error": str(e), "message": "Failed to search vector database"}]
 
 
-@mcp.tool()
-def list_module_resource_uris(output_dir: str = "./output") -> List[Dict[str, Any]]:
-    """Lists all ingested modules with their MCP resource URIs.
+# @mcp.tool()
+# def list_module_resource_uris(output_dir: str = "./output") -> List[Dict[str, Any]]:
+#     """Lists all ingested modules with their MCP resource URIs.
 
-    This tool provides a mapping of all available modules to their resource URIs,
-    which can be used to access full module documentation as MCP resources.
-    Each module is assigned a unique URI that can be read to get complete module
-    information including variables, outputs, providers, resources, and README.
+#     This tool provides a mapping of all available modules to their resource URIs,
+#     which can be used to access full module documentation as MCP resources.
+#     Each module is assigned a unique URI that can be read to get complete module
+#     information including variables, outputs, providers, resources, and README.
 
-    Args:
-        output_dir: Directory containing ingested JSON summaries (default: ./output)
+#     Args:
+#         output_dir: Directory containing ingested JSON summaries (default: ./output)
 
-    Returns:
-        List of modules with:
-        - uri: MCP resource URI for the module (e.g., "module://terraform-aws-vpc/v5.0.0")
-        - repository: Git repository URL
-        - ref: Branch or tag name
-        - path: Path within repository
-        - name: Friendly name for the module
-        - description: Short description of the module
-    """
-    service = get_service(output_dir)
-    return service.list_module_resource_uris()
+#     Returns:
+#         List of modules with:
+#         - uri: MCP resource URI for the module (e.g., "module://terraform-aws-vpc/v5.0.0")
+#         - repository: Git repository URL
+#         - ref: Branch or tag name
+#         - path: Path within repository
+#         - name: Friendly name for the module
+#         - description: Short description of the module
+#     """
+#     service = get_service(output_dir)
+#     return service.list_module_resource_uris()
 
 
 # Resource endpoints for full module documentation
@@ -729,43 +794,438 @@ def get_module_resource(repository: str, ref: str, path: str = "-") -> str:
     all resources it creates, providers required, input variables with descriptions,
     outputs, child modules, and the full README content.
 
-    The path parameter uses hyphens instead of slashes in the URI (e.g., "-" for ".",
-    "modules-aws" for "modules/aws"). Use list_module_resource_uris to get valid URIs.
+    The resource URI uses hyphens as path separators for compatibility with the URI
+    specification (e.g., "-" for ".", "modules-aws" for "modules/aws").
+
+    Module resources support dynamic lookup - provide repository name (or partial match),
+    ref (branch/tag), and path to retrieve any ingested module's complete documentation.
 
     Args:
-        repository: Module repository name from the resource URI
-        ref: Module ref (branch/tag) from the resource URI
-        path: Module path from the resource URI (hyphens will be converted to slashes)
+        repository: Module repository name (can be partial, will match against full URL)
+        ref: Module ref (branch/tag name)
+        path: Module path (hyphen-encoded, e.g., "-" for root, "modules-aws" for modules/aws)
 
     Returns:
-        Full module documentation as formatted text
+        Full module documentation as formatted text with all metadata
+    """
+    return _get_module_resource_impl(repository, ref, path)
+
+
+def list_module_resources_for_discovery() -> List[Dict[str, Any]]:
+    """List all available module resources for MCP discovery.
+
+    This function provides the resource listing that enables clients to discover
+    available module resources before accessing them.
+
+    Returns:
+        List of available module resources with URI, name, and description
     """
     service = get_service()
+    resources = []
 
-    # Decode path: hyphens back to slashes
-    decoded_path = path.replace("-", "/")
-    if decoded_path == "/":
-        decoded_path = "."
+    for module_info in service.list_module_resource_uris():
+        uri = module_info.get("uri", "")
+        name = module_info.get("name", "")
+        description = module_info.get("description", "")
+        repository = module_info.get("repository", "")
+        ref = module_info.get("ref", "")
+        path = module_info.get("path", ".")
 
-    # Try to reconstruct the repository URL
-    # The repository name in the URI is just the basename, so we need to search for matching modules
-    summaries = service._load_all_summaries()
-    for summary in summaries:
-        summary_ref = summary.get("ref")
-        summary_path = summary.get("path", ".")
-        summary_repo = summary.get("repository", "")
-
-        # Check if this summary matches our criteria
-        ref_matches = summary_ref == ref
-        path_matches = (decoded_path == "." and summary_path == ".") or (
-            decoded_path != "." and decoded_path in summary_path
+        resources.append(
+            {
+                "uri": uri,
+                "name": name,
+                "title": f"{name} - {path}",
+                "description": description
+                or f"Terraform module from {repository} @ {ref}",
+                "mimeType": "text/markdown",
+            }
         )
-        repo_matches = repository in summary_repo
 
-        if ref_matches and path_matches and repo_matches:
-            return service.get_module_document(summary_repo, ref, summary_path)
+    return resources
 
-    return f"Module not found: {repository} @ {ref} ({decoded_path})"
+
+def get_argument_completions_for_resources(
+    argument_name: str, argument_value: str
+) -> List[str]:
+    """Get argument completion suggestions for module resource URIs.
+
+    This function supports argument completion for the dynamic resource template,
+    allowing clients to discover valid values for repository, ref, and path parameters.
+
+    Args:
+        argument_name: Name of the argument being completed (repository, ref, or path)
+        argument_value: Current value the user is typing
+
+    Returns:
+        List of matching completion suggestions
+    """
+    service = get_service()
+    summaries = service._load_all_summaries()
+
+    if argument_name == "repository":
+        # Suggest repository names (basename from URL)
+        repos = set()
+        for summary in summaries:
+            repo_url = summary.get("repository", "")
+            if repo_url:
+                # Extract basename and remove .git suffix
+                repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
+                if argument_value.lower() in repo_name.lower():
+                    repos.add(repo_name)
+        return sorted(list(repos))
+
+    elif argument_name == "ref":
+        # Suggest ref names (branches/tags)
+        refs = set()
+        for summary in summaries:
+            ref = summary.get("ref", "")
+            if ref and argument_value.lower() in ref.lower():
+                refs.add(ref)
+        return sorted(list(refs))
+
+    elif argument_name == "path":
+        # Suggest paths
+        paths = set()
+        for summary in summaries:
+            path = summary.get("path", ".")
+            # Encode path for URI (replace / with -)
+            encoded_path = path.replace("/", "-").replace(".", "-")
+            if argument_value.lower() in encoded_path.lower():
+                paths.add(encoded_path)
+        return sorted(list(paths))
+
+    return []
+
+
+# Prompt customization support
+# Store custom prompt overrides from configuration
+_custom_prompts: Dict[str, str] = {}
+
+
+def set_custom_prompts(prompts: Optional[Dict[str, str]]) -> None:
+    """Set custom prompt overrides from configuration.
+
+    This allows the configuration file to override default prompt content
+    for terraform_best_practices, security_checklist, and generate_module_docs.
+
+    Args:
+        prompts: Dict mapping prompt names to custom content strings
+    """
+    global _custom_prompts
+    _custom_prompts = prompts or {}
+
+
+def get_custom_prompt(name: str) -> Optional[str]:
+    """Get a custom prompt override if it exists.
+
+    Args:
+        name: Name of the prompt (e.g., "terraform_best_practices", "security_checklist")
+
+    Returns:
+        Custom prompt content if defined, None otherwise
+    """
+    return _custom_prompts.get(name)
+
+
+# Internal implementations for testable prompt functions
+def _terraform_best_practices_impl(module_type: str = "general") -> str:
+    """Generate a prompt with Terraform best practices.
+
+    This is the internal implementation that can be overridden via custom prompts.
+
+    Args:
+        module_type: Type of module (general, networking, compute, storage, security)
+
+    Returns:
+        Best practices prompt for the specified module type
+    """
+    # Check for custom override
+    custom = get_custom_prompt("terraform_best_practices")
+    if custom:
+        return custom
+
+    base_practices = """
+Follow these Terraform best practices when generating infrastructure code:
+
+1. Code Organization & Structure
+   - Use meaningful variable names and descriptions
+   - Keep modules focused on single responsibilities
+   - Define all variables with types
+   - Always provide descriptions for variables and outputs
+
+2. Version Management
+   - Always specify versions for providers and modules
+   - Use version constraints appropriately (>= for stability, ~> for minor updates)
+   - Use local module sources for internal modules
+   - Document version compatibility requirements
+
+3. Documentation
+   - Document all outputs with descriptions
+   - Include README files with usage examples
+   - Add comments for complex logic
+   - Maintain a changelog for module updates
+
+4. Configuration Best Practices
+   - Use data sources instead of hardcoding values
+   - Implement appropriate tagging strategy
+   - Surface all variable assignments in terraform.tfvars files
+   - Use sensitive variables for credentials and secrets
+   - Never hardcode credentials or secrets
+"""
+
+    module_specific = {
+        "networking": """
+5. Networking-Specific
+   - Use VPCs for network isolation
+   - Implement proper security groups and NACLs
+   - Use private subnets for sensitive resources
+   - Implement VPC endpoints where appropriate
+   - Document network topology
+""",
+        "compute": """
+5. Compute-Specific
+   - Use auto-scaling groups for availability
+   - Implement health checks
+   - Use latest stable AMIs
+   - Tag resources for cost tracking
+   - Set appropriate timeout values
+""",
+        "storage": """
+5. Storage-Specific
+   - Enable encryption for data at rest
+   - Enable versioning for important buckets
+   - Implement lifecycle policies
+   - Use appropriate storage classes
+   - Document backup strategies
+""",
+        "security": """
+5. Security-Specific
+   - Implement least privilege access
+   - Use IAM roles instead of access keys
+   - Enable audit logging
+   - Implement network segmentation
+   - Regular security assessments
+""",
+    }
+
+    return base_practices + module_specific.get(module_type.lower(), "")
+
+
+def _security_checklist_impl() -> list:
+    """Generate a comprehensive security review checklist prompt.
+
+    This is the internal implementation that can be overridden via custom prompts.
+
+    Returns:
+        List of messages that guide users through a security review
+    """
+    from mcp.server.fastmcp.prompts.base import UserMessage
+
+    # Check for custom override
+    custom = get_custom_prompt("security_checklist")
+    if custom:
+        return [UserMessage(custom)]
+
+    return [
+        UserMessage(
+            """
+Please review the following Terraform configuration for security compliance.
+
+Use this checklist:
+
+ACCESS CONTROL:
+- [ ] IAM roles follow least privilege principle
+- [ ] Root account not used for daily operations
+- [ ] MFA enabled for sensitive operations
+- [ ] Service accounts have minimal required permissions
+- [ ] Cross-account access properly scoped
+
+ENCRYPTION:
+- [ ] Data at rest encrypted with appropriate KMS keys
+- [ ] Data in transit uses TLS/SSL (version >= 1.2)
+- [ ] Secrets stored in secrets manager, not configs
+- [ ] Encryption keys properly rotated
+- [ ] Database encryption enabled
+
+LOGGING & MONITORING:
+- [ ] CloudTrail enabled for API auditing
+- [ ] Application logs centralized and retained
+- [ ] Alerts configured for suspicious activity
+- [ ] VPC Flow Logs enabled
+- [ ] CloudWatch monitoring for key metrics
+
+NETWORK SECURITY:
+- [ ] Security groups restrict inbound traffic
+- [ ] Network ACLs properly configured
+- [ ] Private subnets used for sensitive resources
+- [ ] VPC endpoints implemented
+- [ ] Network segmentation implemented
+
+COMPLIANCE & GOVERNANCE:
+- [ ] Resource tagging strategy implemented
+- [ ] Change management documented
+- [ ] Incident response plan in place
+- [ ] Regular backups configured
+- [ ] Disaster recovery tested
+
+Provide feedback on any findings and recommendations for remediation.
+"""
+        )
+    ]
+
+
+def _generate_module_docs_impl(module_name: str = "", module_purpose: str = "") -> str:
+    """Generate documentation structure for a Terraform module.
+
+    This is the internal implementation that can be overridden via custom prompts.
+
+    Args:
+        module_name: Name of the module
+        module_purpose: The purpose/function of the module
+
+    Returns:
+        Template for module documentation
+    """
+    # Check for custom override
+    custom = get_custom_prompt("generate_module_docs")
+    if custom:
+        return custom
+
+    return f"""
+Generate comprehensive documentation for the Terraform module: {module_name}
+
+Purpose: {module_purpose}
+
+Create documentation with the following sections:
+
+## Overview
+- Description of what the module does
+- Use cases and scenarios
+- Key benefits
+
+## Requirements
+- Terraform version requirements
+- Provider requirements and versions
+- External dependencies
+
+## Module Structure
+- Directory layout explanation
+- Key files and their purposes
+- Input and output interfaces
+
+## Inputs (Variables)
+- List all input variables
+- Document type, default, and constraints
+- Provide examples
+
+## Outputs
+- List all outputs
+- Explain what each output represents
+- Show example usage
+
+## Usage Example
+- Provide a minimal working example
+- Show how to call the module
+- Document variable input
+
+## Advanced Usage
+- Advanced configuration options
+- Integration patterns
+- Performance tuning
+
+## Troubleshooting
+- Common issues and solutions
+- Debug approaches
+- Support information
+
+## Contributing
+- How to contribute improvements
+- Testing requirements
+- Release process
+
+## License
+- License information
+- Copyright notice
+"""
+
+
+# Prompts for AI agents
+@mcp.prompt(title="Find Best Terraform Module")
+def find_best_terraform_module_prompt(keywords: str, provider: str) -> str:
+    """Generate a prompt to help find a Terraform module.
+    This prompt guides users in searching for relevant Terraform modules
+    based on their requirements.
+
+    Args:
+        keywords: Keywords describing the desired Terraform module
+        provider: Cloud provider for the Terraform module
+
+    Returns:
+        Prompt string for finding Terraform modules
+    """
+    # if _service.vector_db_enabled:
+    #     search_tool = "search_modules_vector"
+    # else:
+    #     search_tool = "search_modules"
+    return f"""Use the search_modules_vector tool to find the top 5 Terraform modules related to the following query: {keywords}
+for the {provider} provider. For each module. use the get_module_details tool to retrieve detailed information
+about the module, including its variables, outputs, providers, and README content.
+Summarize the key features of each module and determine the best fit for the user's requirements if any are found.
+Return the module repository URL, ref, path, and a brief summary of why it is a good fit.
+"""
+
+
+@mcp.prompt(title="Terraform Best Practices")
+def terraform_best_practices(
+    module_type: str = "general",
+) -> str:
+    """Generate a prompt with Terraform best practices.
+
+    This prompt provides standardized best practices for creating and
+    maintaining Terraform infrastructure code. Can be overridden via
+    mcp.prompts.terraform_best_practices in the configuration file.
+
+    Args:
+        module_type: Type of module (general, networking, compute, storage, security)
+
+    Returns:
+        Best practices prompt for the specified module type
+    """
+    return _terraform_best_practices_impl(module_type)
+
+
+@mcp.prompt(title="Security Review Checklist")
+def security_checklist() -> list:
+    """Generate a comprehensive security review checklist prompt.
+
+    Can be overridden via mcp.prompts.security_checklist in the configuration file.
+
+    Returns a list of messages that guide users through a security review
+    of their Terraform configurations.
+    """
+    return _security_checklist_impl()
+
+
+@mcp.prompt(title="Module Documentation Generator")
+def generate_module_docs(
+    module_name: str = "",
+    module_purpose: str = "",
+) -> str:
+    """Generate documentation structure for a Terraform module.
+
+    Can be overridden via mcp.prompts.generate_module_docs in the configuration file.
+
+    This prompt helps create comprehensive documentation for modules.
+
+    Args:
+        module_name: Name of the module
+        module_purpose: The purpose/function of the module
+
+    Returns:
+        Template for module documentation
+    """
+    return _generate_module_docs_impl(module_name, module_purpose)
 
 
 # Testable wrapper functions (not decorated with @mcp.tool())
@@ -832,43 +1292,48 @@ def _get_module_resource_impl(repository: str, ref: str, path: str = "-") -> str
     """Implementation of get_module_resource for testing."""
     service = get_service()
 
-    # Decode path: hyphens back to slashes
+    # Decode path: hyphens back to slashes, then to underscores for filename
     decoded_path = path.replace("-", "/")
-    if decoded_path == "/":
-        decoded_path = "."
 
-    # Try to reconstruct the repository URL
-    # The repository name in the URI is just the basename, so we need to search for matching modules
-    summaries = service._load_all_summaries()
-    for summary in summaries:
-        if (
-            summary.get("ref") == ref
-            and (
-                decoded_path == "."
-                and summary.get("path") == "."
-                or decoded_path in summary.get("path", "")
-            )
-            and repository in summary.get("repository", "")
-        ):
-            full_repo_url = summary.get("repository", "")
-            full_path = summary.get("path", ".")
-            return service.get_module_document(full_repo_url, ref, full_path)
+    # Reconstruct the filename from the parts
+    # Filename format: {repository}_{ref}_{path}.json
+    # For root path (.), the filename is: {repository}_{ref}_src.json
+    if decoded_path == "/" or decoded_path == ".":
+        filename = f"{repository}_{ref}.json"
+    else:
+        # Replace slashes with underscores in path for filename
+        safe_path = decoded_path.replace("/", "_")
+        filename = f"{repository}_{ref}_{safe_path}.json"
 
-    return f"Module not found: {repository} @ {ref} ({decoded_path})"
+    # Read the JSON file directly
+    json_file = service.output_dir / filename
+
+    if not json_file.exists():
+        return f"Module not found: {repository} @ {ref} ({decoded_path})"
+
+    try:
+        with open(json_file, "r", encoding="utf-8") as f:
+            module_data = json.load(f)
+            # Return as JSON string
+            return json.dumps(module_data, indent=2, default=str)
+    except Exception as e:
+        return f"Error reading module resource: {e}"
 
 
 def _load_config_file(config_file: str = "config.yaml") -> Optional[IngestConfig]:
     """Load configuration file if it exists."""
     config_path = Path(config_file)
     if not config_path.exists():
-        _log(f"Config file {config_file} not found, skipping auto-ingestion")
+        mcp_logger.warning(
+            f"Config file {config_file} not found, skipping auto-ingestion"
+        )
         return None
 
     try:
         ingester = TerraformIngest.from_yaml(str(config_path))
         return ingester.config
     except Exception as e:
-        _log(f"Error loading config file {config_file}: {e}")
+        mcp_logger.error(f"Error loading config file {config_file}: {e}")
         return None
 
 
@@ -878,8 +1343,6 @@ def _update_mcp_instructions(config: Optional[IngestConfig]):
     Args:
         config: Loaded IngestConfig, or None to use default instructions
     """
-    global mcp
-
     if config and config.mcp and config.mcp.instructions:
         mcp.instructions = config.mcp.instructions
     else:
@@ -888,22 +1351,18 @@ def _update_mcp_instructions(config: Optional[IngestConfig]):
         )
 
 
-def _run_ingestion(config_file: str = "config.yaml", silent: bool = False):
+def _run_ingestion(config_file: str = "config.yaml"):
     """Run ingestion process from configuration file."""
     try:
-        if not silent:
-            _log(f"Starting auto-ingestion from {config_file}...")
-        ingester = TerraformIngest.from_yaml(config_file)
-        summaries = ingester.ingest(silent=silent)
-        if not silent:
-            _log(f"Auto-ingestion completed: {len(summaries)} modules processed")
+        mcp_logger.info(f"Starting auto-ingestion from {config_file}...")
+        ingester = TerraformIngest.from_yaml(config_file, logger=mcp_logger)
+        summaries = ingester.ingest()
+        mcp_logger.info(f"Auto-ingestion completed: {len(summaries)} modules processed")
     except Exception as e:
-        _log(f"Error during auto-ingestion: {e}")
+        mcp_logger.error(f"Error during auto-ingestion: {e}")
 
 
-def _start_periodic_ingestion(
-    config: IngestConfig, config_file: str, silent: bool = False
-):
+def _start_periodic_ingestion(config: IngestConfig, config_file: str):
     """Start periodic ingestion in a background thread."""
     if not config.mcp or not config.mcp.refresh_interval_hours:
         return
@@ -912,18 +1371,16 @@ def _start_periodic_ingestion(
         interval_seconds = config.mcp.refresh_interval_hours * 3600
         while True:
             time.sleep(interval_seconds)
-            if not silent:
-                _log(
-                    f"Running scheduled ingestion (every {config.mcp.refresh_interval_hours}h)"
-                )
-            _run_ingestion(config_file, silent=silent)
+            mcp_logger.info(
+                f"Running scheduled ingestion (every {config.mcp.refresh_interval_hours}h)"
+            )
+            _run_ingestion(config_file)
 
     thread = threading.Thread(target=periodic_runner, daemon=True)
     thread.start()
-    if not silent:
-        _log(
-            f"Started periodic ingestion thread (every {config.mcp.refresh_interval_hours}h)"
-        )
+    mcp_logger.info(
+        f"Started periodic ingestion thread (every {config.mcp.refresh_interval_hours}h)"
+    )
 
 
 def start(
@@ -937,9 +1394,9 @@ def start(
 
     Args:
         config_file: Path to the configuration file (default: TERRAFORM_INGEST_CONFIG env var or "config.yaml")
-        transport: Transport mode (stdio, http-streamable, sse) - overrides config
-        host: Host to bind to (for http-streamable and sse) - overrides config
-        port: Port to bind to (for http-streamable and sse) - overrides config
+        transport: Transport mode (stdio, streamable-http, sse) - overrides config
+        host: Host to bind to (for streamable-http and sse) - overrides config
+        port: Port to bind to (for streamable-http and sse) - overrides config
         ingest_on_startup: Run ingestion on startup - overrides config
     """
     # Check for MCP configuration and auto-ingestion
@@ -959,7 +1416,7 @@ def start(
     stdio_mode = transport_mode == "stdio"
 
     # Initialize the TerraformIngest instance and set MCP context
-    ingester = TerraformIngest.from_yaml(config_file)
+    ingester = TerraformIngest.from_yaml(config_file, logger=mcp_logger)
     vector_db_enabled = (config and config.embedding and config.embedding.enabled) or (
         ingester.vector_db is not None
     )
@@ -967,10 +1424,10 @@ def start(
 
     bind_host = host if host else (mcp_config.host if mcp_config else "127.0.0.1")
     bind_port = port if port else (mcp_config.port if mcp_config else 3000)
+    mcp_logger.info(f"Transport: {transport_mode}")
 
     if transport_mode != "stdio":
-        _log(f"Transport: {transport_mode}")
-        _log(f"Listening on {bind_host}:{bind_port}")
+        mcp_logger.info(f"Listening on {bind_host}:{bind_port}")
 
     # Determine ingest_on_startup setting (CLI args override config)
     should_ingest_on_startup = (
@@ -981,20 +1438,20 @@ def start(
 
     # Run ingestion on startup if enabled
     if should_ingest_on_startup:
-        _log("Running ingestion on startup...")
-        _run_ingestion(config_file, silent=stdio_mode)
+        mcp_logger.info("Running ingestion on startup...")
+        _run_ingestion(config_file)
 
     # Start periodic ingestion if configured
     if mcp_config and mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
-        _start_periodic_ingestion(config, config_file, silent=stdio_mode)
+        _start_periodic_ingestion(config, config_file)
 
     # Run with appropriate transport
     if transport_mode == "stdio":
         mcp.run()
-    elif transport_mode == "http-streamable":
-        mcp.run(transport="http-streamable", bind_address=(bind_host, bind_port))
+    elif transport_mode == "streamable-http":
+        mcp.run(transport="streamable-http", host=bind_host, port=bind_port)
     elif transport_mode == "sse":
-        mcp.run(transport="sse", bind_address=(bind_host, bind_port))
+        mcp.run(transport="sse", host=bind_host, port=bind_port)
     else:
         raise ValueError(f"Unknown transport mode: {transport_mode}")
 
@@ -1009,7 +1466,7 @@ def main():
     _update_mcp_instructions(config)
 
     # Initialize the TerraformIngest instance and set MCP context
-    ingester = TerraformIngest.from_yaml(config_file)
+    ingester = TerraformIngest.from_yaml(config_file, logger=mcp_logger)
     vector_db_enabled = (config and config.embedding and config.embedding.enabled) or (
         ingester.vector_db is not None
     )
@@ -1027,21 +1484,21 @@ def main():
     if mcp_config:
         # Run ingestion on startup if enabled
         if mcp_config.ingest_on_startup:
-            _log("MCP auto-ingestion enabled, running initial ingestion...")
-            _run_ingestion(config_file, silent=stdio_mode)
+            mcp_logger.info("MCP auto-ingestion enabled, running initial ingestion...")
+            _run_ingestion(config_file)
 
         # Start periodic ingestion if configured
         if mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
-            _start_periodic_ingestion(config, config_file, silent=stdio_mode)
+            _start_periodic_ingestion(config, config_file)
 
     if transport_mode != "stdio":
-        _log(f"Listening on {bind_host}:{bind_port}")
+        mcp_logger.info(f"Listening on {bind_host}:{bind_port}")
 
     # Run with appropriate transport
     if transport_mode == "stdio":
         mcp.run()
-    elif transport_mode == "http-streamable":
-        mcp.run(transport="http-streamable", bind_address=(bind_host, bind_port))
+    elif transport_mode == "streamable-http":
+        mcp.run(transport="streamable-http", bind_address=(bind_host, bind_port))
     elif transport_mode == "sse":
         mcp.run(transport="sse", bind_address=(bind_host, bind_port))
     else:

@@ -43,6 +43,18 @@ mcp:
     - Search for modules matching the user's requirements
     - Filter results to prioritize tagged releases
     - If only branch versions exist, explicitly mention this as a risk
+  
+  # Custom prompt overrides (optional)
+  # Uncomment to override default prompts with your organization-specific guidance
+  # Available prompt names:
+  #   - terraform_best_practices
+  #   - security_checklist
+  #   - generate_module_docs
+  prompts: {}
+  #   terraform_best_practices: |
+  #     Your custom best practices guidance here...
+  #   security_checklist: |
+  #     Your custom security checklist here...
 
 # Vector database embedding configuration
 embedding:

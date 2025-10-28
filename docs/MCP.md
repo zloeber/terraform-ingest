@@ -4,10 +4,11 @@ This guide explains how to configure and use the terraform-ingest FastMCP servic
 
 ## Overview
 
-The terraform-ingest MCP service exposes ingested Terraform module data to AI agents through the Model Context Protocol (MCP). It provides two main tools:
+The terraform-ingest MCP service exposes ingested Terraform module data to AI agents through the Model Context Protocol (MCP) by exposing several tools including:
 
 1. **list_repositories**: Discover available Terraform repositories
 2. **search_modules**: Find specific modules by criteria
+3. **search_modules_vector**: Search for appropriate modules using vector similarity
 
 ## Prerequisites
 

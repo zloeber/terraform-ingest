@@ -142,7 +142,6 @@ tasks:
     cmds:
       - |
         uv pip install -e ".[docs]"
-        uv run mdtoc README.md
         uv run mkdocs build
 
   test:
@@ -191,6 +190,10 @@ tasks:
         rm -rf .pytest_cache
         rm -rf .venv
         rm -rf src/terraform_ingest/_version.py
+        rm -rf chromadb
+        rm -rf ./output
+        rm -rf ./repos
+        rm -rf ./site
 
   deep:clean:
     desc: Clean the project deeply. Includes uv cache removal.
@@ -218,3 +221,8 @@ tasks:
     env:
       DANGEROUSLY_OMIT_AUTH: true
 
+  update:actions:
+    desc: Update GitHub Actions in workflows
+    cmds:
+      - npx actions-up -y
+  

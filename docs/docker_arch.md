@@ -297,7 +297,7 @@ What do you want to do?
        docker-compose exec terraform-ingest-dev bash
 ```
 
-## 📈 Environment Variable Hierarchy
+## Environment Variable Hierarchy
 
 ```
 Application Configuration
@@ -338,13 +338,13 @@ terraform-ingest/
 ├── .dockerignore                       ← Build optimizations
 ├── docker-compose.yml                  ← Service definitions
 │
-├── DOCKER.md                           ← Quick start guide
+├── docker.md                           ← Quick start guide
 │
 ├── docs/
-│   ├── DOCKER_COMPLETE.md              ← This summary
-│   ├── DOCKER_USAGE_GUIDE.md           ← Full guide (600+ lines)
-│   ├── DOCKER_QUICK_REFERENCE.md       ← Quick commands
-│   ├── DOCKER_IMPLEMENTATION.md        ← Technical details
+│   ├── docker_complete.md              ← This summary
+│   ├── docker_guide.md           ← Full guide (600+ lines)
+│   ├── docker_quick_ref.md       ← Quick commands
+│   ├── docker_complete.md        ← Technical details
 │   └── DOCKER_CHECKLIST.md             ← Verification
 │
 ├── .github/workflows/

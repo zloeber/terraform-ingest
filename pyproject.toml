@@ -3,17 +3,16 @@ name = "terraform-ingest"
 dynamic = ["version"]
 requires-python = ">=3.12"
 dependencies = [
-    "chromadb>=1.2.1",
     "click>=8.3.0",
     "fastapi>=0.119.0",
     "fastmcp>=0.5.0",
     "gitpython>=3.1.45",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
+    "packaging>=24.0",
     "pydantic>=2.12.2",
     "python-hcl2>=7.3.1",
     "pyyaml>=6.0.3",
-    "sentence-transformers>=5.1.2",
     "urllib3>=2.5.0",
     "uvicorn>=0.37.0",
 ]
@@ -63,4 +62,4 @@ docs = ["mkdocs", "mkdocs-material", "mkdocstrings", "mkdocs-click", "mdtoc", "m
 lint = ["ruff", "black", "isort", "mypy"]
 format = ["black", "isort"]
 typecheck = ["mypy"]
-embeddings = ["chromadb>=0.4.0", "sentence-transformers>=2.2.0", "openai>=1.0.0", "voyageai>=0.2.0"]
+embeddings = ["chromadb>=1.2.1", "sentence-transformers>=5.1.2", "openai>=1.0.0", "voyageai>=0.2.0"]

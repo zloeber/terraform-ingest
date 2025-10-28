@@ -1,0 +1,27 @@
+{
+  "servers": {
+    "terraform-ingest-mcp": {
+      "command": "uvx",
+      "args": ["terraform-ingest" , "mcp", "-c", "examples/cloudposse.yaml", "--no-ingest-on-startup"]
+    },
+    "terraform": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "hashicorp/terraform-mcp-server"
+      ],
+      "type": "stdio"
+    },
+    "mcp-feedback-enhanced": {
+      "command": "uvx",
+      "args": ["mcp-feedback-enhanced@latest"]
+    },
+    "aws-knowledge": {
+			"url": "https://knowledge-mcp.global.api.aws",
+			"type": "http"
+		}
+  },
+  "inputs": []
+}

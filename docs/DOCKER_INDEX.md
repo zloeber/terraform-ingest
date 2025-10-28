@@ -5,11 +5,11 @@ Welcome to the terraform-ingest Docker documentation! This page helps you naviga
 ## 🚀 Getting Started (Start Here!)
 
 **First time? Start here:**
-- **[DOCKER.md](../DOCKER.md)** - Quick start guide with all three modes
+- **[docker.md](./docker.md)** - Quick start guide with all three modes
 
 ## 📚 Main Documentation Files
 
-### 1. 🎯 **[DOCKER_QUICK_REFERENCE.md](DOCKER_QUICK_REFERENCE.md)**
+### 1. 🎯 **[docker_quick_ref.md](docker_quick_ref.md)**
 - **Length**: ~150 lines
 - **Purpose**: Copy-paste commands for common tasks
 - **Best for**: Quick lookups, cheat sheet
@@ -20,7 +20,7 @@ Welcome to the terraform-ingest Docker documentation! This page helps you naviga
   - Docker Compose shortcuts
   - Health check commands
 
-### 2. 📖 **[DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md)**
+### 2. 📖 **[docker_guide.md](docker_guide.md)**
 - **Length**: ~600 lines
 - **Purpose**: Comprehensive guide covering all aspects
 - **Best for**: Detailed understanding, production setup
@@ -37,7 +37,7 @@ Welcome to the terraform-ingest Docker documentation! This page helps you naviga
   - Troubleshooting section
   - Best practices
 
-### 3. 🏗️ **[DOCKER_IMPLEMENTATION.md](DOCKER_IMPLEMENTATION.md)**
+### 3. 🏗️ **[docker_complete.md](docker_complete.md)**
 - **Length**: ~400 lines
 - **Purpose**: Technical implementation details
 - **Best for**: Understanding how it works, deployment
@@ -51,21 +51,7 @@ Welcome to the terraform-ingest Docker documentation! This page helps you naviga
   - Next steps for deployment
   - Benefits summary
 
-### 4. ✅ **[DOCKER_CHECKLIST.md](DOCKER_CHECKLIST.md)**
-- **Length**: ~300 lines
-- **Purpose**: Verification and validation
-- **Best for**: Ensuring everything is set up correctly
-- **Contains**:
-  - Files created checklist
-  - Build targets table
-  - Build commands
-  - Feature implementation checklist
-  - Configuration examples
-  - Health check commands
-  - Troubleshooting quick reference
-  - Summary checklist
-
-### 5. 📊 **[DOCKER_ARCHITECTURE.md](DOCKER_ARCHITECTURE.md)**
+### 4. 📊 **[docker_arch.md](docker_arch.md)**
 - **Length**: ~300 lines
 - **Purpose**: Visual diagrams and architecture explanation
 - **Best for**: Understanding system design
@@ -80,7 +66,7 @@ Welcome to the terraform-ingest Docker documentation! This page helps you naviga
   - Environment variable hierarchy
   - Project structure
 
-### 6. 🎉 **[DOCKER_COMPLETE.md](DOCKER_COMPLETE.md)**
+### 6. 🎉 **[docker_complete.md](docker_complete.md)**
 - **Length**: ~250 lines
 - **Purpose**: Comprehensive summary of everything
 - **Best for**: Overview before diving in
@@ -100,46 +86,42 @@ Welcome to the terraform-ingest Docker documentation! This page helps you naviga
 ### I want to...
 
 **Get started immediately**
-→ Read: [DOCKER.md](../DOCKER.md)
+→ Read: [docker.md](./docker.md)
 
 **Learn all available commands**
-→ Read: [DOCKER_QUICK_REFERENCE.md](DOCKER_QUICK_REFERENCE.md)
+→ Read: [docker_quick_ref.md](docker_quick_ref.md)
 
 **Understand detailed setup**
-→ Read: [DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md)
+→ Read: [docker_guide.md](docker_guide.md)
 
 **Deploy to production**
-→ Read: [DOCKER_IMPLEMENTATION.md](DOCKER_IMPLEMENTATION.md)
+→ Read: [docker_complete.md](docker_complete.md)
 
 **Deploy to Kubernetes**
-→ Read: [DOCKER_IMPLEMENTATION.md](DOCKER_IMPLEMENTATION.md#kubernetes-example)
-
-**Verify my setup**
-→ Read: [DOCKER_CHECKLIST.md](DOCKER_CHECKLIST.md)
+→ Read: [docker_complete.md](docker_complete.md#kubernetes-example)
 
 **Understand the architecture**
-→ Read: [DOCKER_ARCHITECTURE.md](DOCKER_ARCHITECTURE.md)
+→ Read: [docker_arch.md](docker_arch.md)
 
 **See everything at once**
-→ Read: [DOCKER_COMPLETE.md](DOCKER_COMPLETE.md)
+→ Read: [docker_complete.md](docker_complete.md)
 
 **Troubleshoot issues**
-→ Read: [DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md#troubleshooting) or [DOCKER_QUICK_REFERENCE.md](DOCKER_QUICK_REFERENCE.md#troubleshooting)
+→ Read: [docker_guide.md](docker_guide.md#troubleshooting) or [docker_quick_ref.md](docker_quick_ref.md#troubleshooting)
 
 ## 🎯 By Experience Level
 
 ### Beginner
-1. Start with: [DOCKER.md](../DOCKER.md)
-2. Then read: [DOCKER_QUICK_REFERENCE.md](DOCKER_QUICK_REFERENCE.md)
-3. Reference: [DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md) when needed
+1. Start with: [docker.md](./docker.md)
+2. Then read: [docker_quick_ref.md](docker_quick_ref.md)
+3. Reference: [docker_guide.md](docker_guide.md) when needed
 
 ### Intermediate
-1. Start with: [DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md)
-2. Explore: [DOCKER_ARCHITECTURE.md](DOCKER_ARCHITECTURE.md)
-3. Verify: [DOCKER_CHECKLIST.md](DOCKER_CHECKLIST.md)
+1. Start with: [docker_guide.md](docker_guide.md)
+2. Explore: [docker_arch.md](docker_arch.md)
 
 ### Advanced
-1. Review: [DOCKER_IMPLEMENTATION.md](DOCKER_IMPLEMENTATION.md)
+1. Review: [docker_complete.md](docker_complete.md)
 2. Study: [Dockerfile](../Dockerfile) source
 3. Configure: [docker-compose.yml](../docker-compose.yml)
 4. Deploy: [.github/workflows/docker-build.yml](../.github/workflows/docker-build.yml)
@@ -147,100 +129,96 @@ Welcome to the terraform-ingest Docker documentation! This page helps you naviga
 ## 🔍 By Topic
 
 ### Building Images
-- [DOCKER_QUICK_REFERENCE.md#build-images](DOCKER_QUICK_REFERENCE.md#build-images)
-- [DOCKER_USAGE_GUIDE.md#quick-start](DOCKER_USAGE_GUIDE.md#quick-start)
+- [docker_quick_ref.md#build-images](docker_quick_ref.md#build-images)
+- [docker_guide.md#quick-start](docker_guide.md#quick-start)
 - [Dockerfile](../Dockerfile)
 
 ### CLI Mode
-- [DOCKER.md](../DOCKER.md#-cli-mode)
-- [DOCKER_QUICK_REFERENCE.md#cli-mode](DOCKER_QUICK_REFERENCE.md#cli-mode)
-- [DOCKER_USAGE_GUIDE.md#mode-1-cli-mode](DOCKER_USAGE_GUIDE.md#mode-1-cli-mode)
+- [docker.md](./docker.md#-cli-mode)
+- [docker_quick_ref.md#cli-mode](docker_quick_ref.md#cli-mode)
+- [docker_guide.md#mode-1-cli-mode](docker_guide.md#mode-1-cli-mode)
 
 ### API Mode
-- [DOCKER.md](../DOCKER.md#-api-mode)
-- [DOCKER_QUICK_REFERENCE.md#api-mode](DOCKER_QUICK_REFERENCE.md#api-mode)
-- [DOCKER_USAGE_GUIDE.md#mode-2-api-mode](DOCKER_USAGE_GUIDE.md#mode-2-api-mode)
+- [docker.md](./docker.md#-api-mode)
+- [docker_quick_ref.md#api-mode](docker_quick_ref.md#api-mode)
+- [docker_guide.md#mode-2-api-mode](docker_guide.md#mode-2-api-mode)
 
 ### MCP Mode
-- [DOCKER.md](../DOCKER.md#-mcp-mode)
-- [DOCKER_QUICK_REFERENCE.md#mcp-mode](DOCKER_QUICK_REFERENCE.md#mcp-mode)
-- [DOCKER_USAGE_GUIDE.md#mode-3-mcp-server-mode](DOCKER_USAGE_GUIDE.md#mode-3-mcp-server-mode)
+- [docker.md](./docker.md#-mcp-mode)
+- [docker_quick_ref.md#mcp-mode](docker_quick_ref.md#mcp-mode)
+- [docker_guide.md#mode-3-mcp-server-mode](docker_guide.md#mode-3-mcp-server-mode)
 
 ### Development
-- [DOCKER.md](../DOCKER.md#-dev-mode)
-- [DOCKER_QUICK_REFERENCE.md#development-mode](DOCKER_QUICK_REFERENCE.md#development-mode)
-- [DOCKER_USAGE_GUIDE.md#mode-4-development-mode](DOCKER_USAGE_GUIDE.md#mode-4-development-mode)
+- [docker.md](./docker.md#-dev-mode)
+- [docker_quick_ref.md#development-mode](docker_quick_ref.md#development-mode)
+- [docker_guide.md#mode-4-development-mode](docker_guide.md#mode-4-development-mode)
 
 ### Configuration
-- [DOCKER_USAGE_GUIDE.md#configuration-file](DOCKER_USAGE_GUIDE.md#configuration-file)
-- [DOCKER_CHECKLIST.md#configuration-examples](DOCKER_CHECKLIST.md#configuration-examples)
+- [docker_guide.md#configuration-file](docker_guide.md#configuration-file)
 - [docker-compose.yml](../docker-compose.yml)
 
 ### Volume Mounts
-- [DOCKER_USAGE_GUIDE.md#volume-mounts](DOCKER_USAGE_GUIDE.md#volume-mounts)
-- [DOCKER_ARCHITECTURE.md#-volume-mount-architecture](DOCKER_ARCHITECTURE.md#-volume-mount-architecture)
-- [DOCKER_QUICK_REFERENCE.md](DOCKER_QUICK_REFERENCE.md)
+- [docker_guide.md#volume-mounts](docker_guide.md#volume-mounts)
+- [docker_arch.md#-volume-mount-architecture](docker_arch.md#-volume-mount-architecture)
+- [docker_quick_ref.md](docker_quick_ref.md)
 
 ### Environment Variables
-- [DOCKER_QUICK_REFERENCE.md#environment-variables](DOCKER_QUICK_REFERENCE.md#environment-variables)
-- [DOCKER_CHECKLIST.md#environment-variables-by-mode](DOCKER_CHECKLIST.md#environment-variables-by-mode)
-- [DOCKER_ARCHITECTURE.md#-environment-variable-hierarchy](DOCKER_ARCHITECTURE.md#-environment-variable-hierarchy)
+- [docker_quick_ref.md#environment-variables](docker_quick_ref.md#environment-variables)
+- [docker_arch.md#-environment-variable-hierarchy](docker_arch.md#environment-variable-hierarchy)
 
 ### Deployment
-- [DOCKER_IMPLEMENTATION.md#production-deployment](DOCKER_IMPLEMENTATION.md#production-deployment)
-- [DOCKER_USAGE_GUIDE.md#examples](DOCKER_USAGE_GUIDE.md#examples)
+- [docker_complete.md#production-deployment](docker_complete.md#production-deployment)
+- [docker_guide.md#examples](docker_guide.md#examples)
 
 ### Troubleshooting
-- [DOCKER_USAGE_GUIDE.md#troubleshooting](DOCKER_USAGE_GUIDE.md#troubleshooting)
-- [DOCKER_QUICK_REFERENCE.md#cleanup](DOCKER_QUICK_REFERENCE.md#cleanup)
-- [DOCKER_CHECKLIST.md](DOCKER_CHECKLIST.md)
+- [docker_guide.md#troubleshooting](docker_guide.md#troubleshooting)
+- [docker_quick_ref.md#cleanup](docker_quick_ref.md#cleanup)
 
 ### Security
-- [DOCKER_IMPLEMENTATION.md#security-features](DOCKER_IMPLEMENTATION.md#security-features)
-- [DOCKER_USAGE_GUIDE.md#security](DOCKER_USAGE_GUIDE.md)
-- [DOCKER_ARCHITECTURE.md#-security-model](DOCKER_ARCHITECTURE.md#-security-model)
+- [docker_complete.md#security-features](docker_complete.md#security-features)
+- [docker_guide.md#security](docker_guide.md)
+- [docker_arch.md#-security-model](docker_arch.md#-security-model)
 
 ### Performance
-- [DOCKER_IMPLEMENTATION.md#build-optimization](DOCKER_IMPLEMENTATION.md#build-optimization)
-- [DOCKER_USAGE_GUIDE.md#performance-optimization](DOCKER_USAGE_GUIDE.md#performance-optimization)
-- [DOCKER_ARCHITECTURE.md#-multi-stage-build-architecture](DOCKER_ARCHITECTURE.md#-multi-stage-build-architecture)
+- [docker_complete.md#build-optimization](docker_complete.md#build-optimization)
+- [docker_guide.md#performance-optimization](docker_guide.md#performance-optimization)
+- [docker_arch.md#-multi-stage-build-architecture](docker_arch.md#-multi-stage-build-architecture)
 
 ### CI/CD
-- [DOCKER_IMPLEMENTATION.md#github-actions-workflow](DOCKER_IMPLEMENTATION.md#github-actions-workflow)
-- [DOCKER_ARCHITECTURE.md#-cicd-pipeline-flow](DOCKER_ARCHITECTURE.md#-cicd-pipeline-flow)
+- [docker_complete.md#github-actions-workflow](docker_complete.md#github-actions-workflow)
+- [docker_arch.md#-cicd-pipeline-flow](docker_arch.md#-cicd-pipeline-flow)
 - [.github/workflows/docker-build.yml](../.github/workflows/docker-build.yml)
 
 ### Kubernetes
-- [DOCKER_IMPLEMENTATION.md#kubernetes-example](DOCKER_IMPLEMENTATION.md#kubernetes-example)
-- [DOCKER_USAGE_GUIDE.md#kubernetes](DOCKER_USAGE_GUIDE.md)
+- [docker_complete.md#kubernetes-example](docker_complete.md#kubernetes-example)
+- [docker_guide.md#kubernetes](docker_guide.md)
 
 ## 📊 Documentation Overview
 
 | File | Lines | Purpose | Audience |
 |------|-------|---------|----------|
-| [DOCKER_QUICK_REFERENCE.md](DOCKER_QUICK_REFERENCE.md) | ~150 | Commands & options | All levels |
-| [DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md) | ~600 | Comprehensive guide | Intermediate+ |
-| [DOCKER_IMPLEMENTATION.md](DOCKER_IMPLEMENTATION.md) | ~400 | Technical details | Advanced |
-| [DOCKER_CHECKLIST.md](DOCKER_CHECKLIST.md) | ~300 | Verification | All levels |
-| [DOCKER_ARCHITECTURE.md](DOCKER_ARCHITECTURE.md) | ~300 | Visual diagrams | Intermediate+ |
-| [DOCKER_COMPLETE.md](DOCKER_COMPLETE.md) | ~250 | Complete summary | All levels |
+| [docker_quick_ref.md](docker_quick_ref.md) | ~150 | Commands & options | All levels |
+| [docker_guide.md](docker_guide.md) | ~600 | Comprehensive guide | Intermediate+ |
+| [docker_complete.md](docker_complete.md) | ~400 | Technical details | Advanced |
+| [docker_arch.md](docker_arch.md) | ~300 | Visual diagrams | Intermediate+ |
+| [docker_complete.md](docker_complete.md) | ~250 | Complete summary | All levels |
 
 ## 🎓 Learning Path
 
 ### Path 1: Quick Start (30 minutes)
-1. Read [DOCKER.md](../DOCKER.md) (10 min)
-2. Run examples from [DOCKER_QUICK_REFERENCE.md](DOCKER_QUICK_REFERENCE.md) (10 min)
+1. Read [docker.md](./docker.md) (10 min)
+2. Run examples from [docker_quick_ref.md](docker_quick_ref.md) (10 min)
 3. Test with your config (10 min)
 
 ### Path 2: Complete Understanding (2 hours)
-1. Read [DOCKER.md](../DOCKER.md) (10 min)
-2. Read [DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md) (60 min)
-3. Study [DOCKER_ARCHITECTURE.md](DOCKER_ARCHITECTURE.md) (20 min)
+1. Read [docker.md](./docker.md) (10 min)
+2. Read [docker_guide.md](docker_guide.md) (60 min)
+3. Study [docker_arch.md](docker_arch.md) (20 min)
 4. Practice with examples (30 min)
 
 ### Path 3: Production Ready (4 hours)
-1. Read [DOCKER_COMPLETE.md](DOCKER_COMPLETE.md) (20 min)
-2. Study [DOCKER_IMPLEMENTATION.md](DOCKER_IMPLEMENTATION.md) (40 min)
+1. Read [docker_complete.md](docker_complete.md) (20 min)
+2. Study [docker_complete.md](docker_complete.md) (40 min)
 3. Review [Dockerfile](../Dockerfile) (20 min)
 4. Review [.github/workflows/docker-build.yml](../.github/workflows/docker-build.yml) (20 min)
 5. Plan deployment (40 min)
@@ -249,28 +227,28 @@ Welcome to the terraform-ingest Docker documentation! This page helps you naviga
 ## 🔗 Cross-References
 
 ### From CLI Mode
-- Need API? → [DOCKER_USAGE_GUIDE.md#mode-2-api-mode](DOCKER_USAGE_GUIDE.md#mode-2-api-mode)
-- Need MCP? → [DOCKER_USAGE_GUIDE.md#mode-3-mcp-server-mode](DOCKER_USAGE_GUIDE.md#mode-3-mcp-server-mode)
-- Questions? → [DOCKER_QUICK_REFERENCE.md](DOCKER_QUICK_REFERENCE.md)
+- Need API? → [docker_guide.md#mode-2-api-mode](docker_guide.md#mode-2-api-mode)
+- Need MCP? → [docker_guide.md#mode-3-mcp-server-mode](docker_guide.md#mode-3-mcp-server-mode)
+- Questions? → [docker_quick_ref.md](docker_quick_ref.md)
 
 ### From API Mode
-- Need CLI? → [DOCKER_USAGE_GUIDE.md#mode-1-cli-mode](DOCKER_USAGE_GUIDE.md#mode-1-cli-mode)
-- Deploy to K8s? → [DOCKER_IMPLEMENTATION.md#kubernetes-example](DOCKER_IMPLEMENTATION.md#kubernetes-example)
-- Configuration? → [DOCKER_USAGE_GUIDE.md#configuration](DOCKER_USAGE_GUIDE.md#configuration)
+- Need CLI? → [docker_guide.md#mode-1-cli-mode](docker_guide.md#mode-1-cli-mode)
+- Deploy to K8s? → [docker_complete.md#kubernetes-example](docker_complete.md#kubernetes-example)
+- Configuration? → [docker_guide.md#configuration](docker_guide.md#configuration)
 
 ### From MCP Mode
-- Need API? → [DOCKER_USAGE_GUIDE.md#mode-2-api-mode](DOCKER_USAGE_GUIDE.md#mode-2-api-mode)
-- AI integration? → [DOCKER_USAGE_GUIDE.md#usage-with-ai-agents](DOCKER_USAGE_GUIDE.md#usage-with-ai-agents)
-- Configuration? → [DOCKER_USAGE_GUIDE.md#mcp-configuration](DOCKER_USAGE_GUIDE.md#mcp-configuration)
+- Need API? → [docker_guide.md#mode-2-api-mode](docker_guide.md#mode-2-api-mode)
+- AI integration? → [docker_guide.md#usage-with-ai-agents](docker_guide.md#usage-with-ai-agents)
+- Configuration? → [docker_guide.md#mcp-configuration](docker_guide.md#mcp-configuration)
 
 ## 🆘 Quick Help
 
 **I need to...**
-- Run commands → [DOCKER_QUICK_REFERENCE.md](DOCKER_QUICK_REFERENCE.md)
-- Fix an error → [DOCKER_USAGE_GUIDE.md#troubleshooting](DOCKER_USAGE_GUIDE.md#troubleshooting)
-- Understand how it works → [DOCKER_ARCHITECTURE.md](DOCKER_ARCHITECTURE.md)
-- Deploy to production → [DOCKER_IMPLEMENTATION.md#production-deployment](DOCKER_IMPLEMENTATION.md#production-deployment)
-- Learn more → [DOCKER_USAGE_GUIDE.md](DOCKER_USAGE_GUIDE.md)
+- Run commands → [docker_quick_ref.md](docker_quick_ref.md)
+- Fix an error → [docker_guide.md#troubleshooting](docker_guide.md#troubleshooting)
+- Understand how it works → [docker_arch.md](docker_arch.md)
+- Deploy to production → [docker_complete.md#production-deployment](docker_complete.md#production-deployment)
+- Learn more → [docker_guide.md](docker_guide.md)
 
 ## ✨ Key Resources
 

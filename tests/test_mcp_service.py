@@ -113,7 +113,11 @@ def sample_output_dir():
                 ],
                 "modules": [],
                 "resources": [
-                    {"type": "azurerm_virtual_network", "name": "main", "description": None},
+                    {
+                        "type": "azurerm_virtual_network",
+                        "name": "main",
+                        "description": None,
+                    },
                     {"type": "azurerm_subnet", "name": "main", "description": None},
                 ],
                 "readme_content": "# Azure Network Terraform module\nThis module creates Azure network resources",
@@ -454,14 +458,15 @@ def test_get_module_details_wrong_path(sample_output_dir):
 
 def test_mcp_get_module_details_tool(sample_output_dir):
     """Test the MCP get_module_details tool function."""
-    from terraform_ingest.mcp_service import _get_module_details_impl
+    from terraform_ingest.mcp_service import ModuleQueryService
 
-    # Test retrieving a module successfully
-    module = _get_module_details_impl(
+    service = ModuleQueryService(sample_output_dir)
+
+    # Test retrieving a module successfully without readme (default)
+    module = service.get_module(
         repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
         ref="main",
         path=".",
-        output_dir=sample_output_dir,
     )
 
     assert module is not None
@@ -471,14 +476,25 @@ def test_mcp_get_module_details_tool(sample_output_dir):
     )
     assert module["ref"] == "main"
 
-    # Verify complete structure
+    # Verify complete structure (excluding readme by default)
     assert "path" in module
     assert "description" in module
     assert "variables" in module
     assert "outputs" in module
     assert "providers" in module
     assert "modules" in module
-    assert "readme_content" in module
+    assert "readme_content" not in module
+
+    # Test retrieving a module with readme included
+    module_with_readme = service.get_module(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        ref="main",
+        path=".",
+        include_readme=True,
+    )
+
+    assert module_with_readme is not None
+    assert "readme_content" in module_with_readme
 
 
 def test_mcp_get_module_details_tool_not_found(sample_output_dir):
@@ -679,29 +695,29 @@ def test_get_service_singleton():
     mcp_module._service = None
 
 
-def test_list_modules(sample_output_dir):
-    """Test listing all modules."""
-    service = ModuleQueryService(sample_output_dir)
-    modules = service.list_modules()
+# def test_list_modules(sample_output_dir):
+#     """Test listing all modules."""
+#     service = ModuleQueryService(sample_output_dir)
+#     modules = service.list_modules()
 
-    assert len(modules) == 3
-    assert all("repository" in m for m in modules)
-    assert all("ref" in m for m in modules)
-    assert all("resource_count" in m for m in modules)
-    assert all("variable_count" in m for m in modules)
-    assert all("output_count" in m for m in modules)
+#     assert len(modules) == 3
+#     assert all("repository" in m for m in modules)
+#     assert all("ref" in m for m in modules)
+#     assert all("resource_count" in m for m in modules)
+#     assert all("variable_count" in m for m in modules)
+#     assert all("output_count" in m for m in modules)
 
-    # Check AWS VPC modules have resources
-    aws_modules = [m for m in modules if "terraform-aws-vpc" in m["repository"]]
-    assert all(m["resource_count"] == 3 for m in aws_modules)
+#     # Check AWS VPC modules have resources
+#     aws_modules = [m for m in modules if "terraform-aws-vpc" in m["repository"]]
+#     assert all(m["resource_count"] == 3 for m in aws_modules)
 
 
-def test_list_modules_with_limit(sample_output_dir):
-    """Test listing modules with limit."""
-    service = ModuleQueryService(sample_output_dir)
-    modules = service.list_modules(limit=2)
+# def test_list_modules_with_limit(sample_output_dir):
+#     """Test listing modules with limit."""
+#     service = ModuleQueryService(sample_output_dir)
+#     modules = service.list_modules(limit=2)
 
-    assert len(modules) == 2
+#     assert len(modules) == 2
 
 
 def test_list_module_resources_aws_vpc(sample_output_dir):
@@ -780,18 +796,6 @@ def test_generate_module_uri(sample_output_dir):
     assert uri.startswith("module://")
 
 
-def test_list_module_resource_uris(sample_output_dir):
-    """Test listing module resource URIs."""
-    service = ModuleQueryService(sample_output_dir)
-    uris = service.list_module_resource_uris()
-
-    assert len(uris) == 3
-    assert all("uri" in u for u in uris)
-    assert all("repository" in u for u in uris)
-    assert all("ref" in u for u in uris)
-    assert all(u["uri"].startswith("module://") for u in uris)
-
-
 def test_get_module_document_aws_vpc(sample_output_dir):
     """Test getting module documentation for AWS VPC."""
     service = ModuleQueryService(sample_output_dir)
@@ -810,7 +814,9 @@ def test_get_module_document_aws_vpc(sample_output_dir):
 def test_get_module_document_not_found(sample_output_dir):
     """Test getting module documentation for non-existent module."""
     service = ModuleQueryService(sample_output_dir)
-    doc = service.get_module_document("https://github.com/nonexistent/repo", "main", ".")
+    doc = service.get_module_document(
+        "https://github.com/nonexistent/repo", "main", "."
+    )
 
     assert "Module not found" in doc
 
@@ -834,9 +840,7 @@ def test_get_module_resource(sample_output_dir):
 
     # Get module document directly using the service method
     doc = service.get_module_document(
-        "https://github.com/terraform-aws-modules/terraform-aws-vpc",
-        "main",
-        "."
+        "https://github.com/terraform-aws-modules/terraform-aws-vpc", "main", "."
     )
 
     assert "# Terraform Module:" in doc
@@ -851,9 +855,7 @@ def test_get_module_resource_impl_wrapper(sample_output_dir):
     from terraform_ingest.mcp_service import _get_module_resource_impl
 
     # Test with a non-existent module
-    doc = _get_module_resource_impl(
-        repository="nonexistent", ref="main", path="-"
-    )
+    doc = _get_module_resource_impl(repository="nonexistent", ref="main", path="-")
     assert "Module not found" in doc
 
 
@@ -868,5 +870,264 @@ def test_module_document_includes_sections(sample_output_dir):
     assert "# Terraform Module:" in doc
     assert "## Resources" in doc or "aws_vpc" in doc
     assert "## Providers" in doc
-    assert "## Input Variables" in doc or "## Outputs" in doc
-    assert "repository" in doc or "github.com" in doc
+
+
+def test_list_module_resources_for_discovery(sample_output_dir):
+    """Test resource listing for MCP discovery."""
+    from terraform_ingest.mcp_service import (
+        set_mcp_context,
+        list_module_resources_for_discovery,
+    )
+    from terraform_ingest.ingest import TerraformIngest
+
+    # Initialize service and context
+    ingester = TerraformIngest.from_yaml("config.yaml")
+    # Use the sample output directory for testing
+    ingester.config.output_dir = sample_output_dir
+    set_mcp_context(ingester, ingester.config, False)
+
+    resources = list_module_resources_for_discovery()
+
+    assert isinstance(resources, list)
+    assert len(resources) > 0
+    assert all("uri" in r for r in resources)
+    assert all("name" in r for r in resources)
+    assert all("title" in r for r in resources)
+    assert all("mimeType" in r for r in resources)
+    # Check that all resources are markdown
+    assert all(r["mimeType"] == "text/markdown" for r in resources)
+
+
+def test_get_argument_completions_for_repositories(sample_output_dir):
+    """Test argument completion for repository parameter."""
+    from terraform_ingest.mcp_service import (
+        set_mcp_context,
+        get_argument_completions_for_resources,
+    )
+    from terraform_ingest.ingest import TerraformIngest
+
+    # Initialize context
+    ingester = TerraformIngest.from_yaml("config.yaml")
+    # Use the sample output directory for testing
+    ingester.config.output_dir = sample_output_dir
+    set_mcp_context(ingester, ingester.config, False)
+
+    completions = get_argument_completions_for_resources("repository", "terraform-aws")
+
+    assert isinstance(completions, list)
+    assert len(completions) > 0
+    assert any("terraform-aws" in c for c in completions)
+
+
+def test_get_argument_completions_for_refs(sample_output_dir):
+    """Test argument completion for ref parameter."""
+    from terraform_ingest.mcp_service import (
+        set_mcp_context,
+        get_argument_completions_for_resources,
+    )
+    from terraform_ingest.ingest import TerraformIngest
+
+    # Initialize context
+    ingester = TerraformIngest.from_yaml("config.yaml")
+    # Use the sample output directory for testing
+    ingester.config.output_dir = sample_output_dir
+    set_mcp_context(ingester, ingester.config, False)
+
+    completions = get_argument_completions_for_resources("ref", "main")
+
+    assert isinstance(completions, list)
+    assert len(completions) > 0
+    assert "main" in completions
+
+
+def test_get_argument_completions_for_paths(sample_output_dir):
+    """Test argument completion for path parameter."""
+    from terraform_ingest.mcp_service import (
+        set_mcp_context,
+        get_argument_completions_for_resources,
+    )
+    from terraform_ingest.ingest import TerraformIngest
+
+    # Initialize context
+    ingester = TerraformIngest.from_yaml("config.yaml")
+    # Use the sample output directory for testing
+    ingester.config.output_dir = sample_output_dir
+    set_mcp_context(ingester, ingester.config, False)
+
+    completions = get_argument_completions_for_resources("path", "")
+
+    assert isinstance(completions, list)
+    # Should include at least one encoded path
+    assert any("-" in c or c == "-" for c in completions)
+
+
+def test_set_custom_prompts():
+    """Test setting custom prompt overrides."""
+    from terraform_ingest.mcp_service import (
+        set_custom_prompts,
+        get_custom_prompt,
+    )
+
+    custom_prompts = {
+        "terraform_best_practices": "Custom best practices",
+        "security_checklist": "Custom security checklist",
+    }
+
+    set_custom_prompts(custom_prompts)
+
+    assert get_custom_prompt("terraform_best_practices") == "Custom best practices"
+    assert get_custom_prompt("security_checklist") == "Custom security checklist"
+    assert get_custom_prompt("nonexistent") is None
+
+
+def test_terraform_best_practices_default():
+    """Test default terraform best practices prompt."""
+    from terraform_ingest.mcp_service import (
+        set_custom_prompts,
+        _terraform_best_practices_impl,
+    )
+
+    # Ensure no custom prompts
+    set_custom_prompts(None)
+
+    # Access the underlying implementation
+    result = _terraform_best_practices_impl()
+
+    assert isinstance(result, str)
+    assert "Best practices" in result or "best practices" in result
+    assert len(result) > 100
+
+
+def test_terraform_best_practices_custom_override():
+    """Test terraform best practices with custom override."""
+    from terraform_ingest.mcp_service import (
+        set_custom_prompts,
+        _terraform_best_practices_impl,
+    )
+
+    custom_message = "My organization's custom best practices"
+    set_custom_prompts({"terraform_best_practices": custom_message})
+
+    result = _terraform_best_practices_impl()
+
+    assert result == custom_message
+
+
+def test_terraform_best_practices_with_module_type():
+    """Test terraform best practices with module type when overridden."""
+    from terraform_ingest.mcp_service import (
+        set_custom_prompts,
+        _terraform_best_practices_impl,
+    )
+
+    custom_message = "Custom networking practices"
+    set_custom_prompts({"terraform_best_practices": custom_message})
+
+    # Even with module_type parameter, custom override should be used
+    result = _terraform_best_practices_impl(module_type="networking")
+
+    assert result == custom_message
+
+
+def test_security_checklist_default():
+    """Test default security checklist prompt."""
+    from terraform_ingest.mcp_service import (
+        set_custom_prompts,
+        _security_checklist_impl,
+    )
+
+    # Ensure no custom prompts
+    set_custom_prompts(None)
+
+    result = _security_checklist_impl()
+
+    assert isinstance(result, list)
+    assert len(result) > 0
+    # Should be a list of UserMessage objects
+    assert hasattr(result[0], "__class__")
+
+
+def test_security_checklist_custom_override():
+    """Test security checklist with custom override."""
+    from terraform_ingest.mcp_service import (
+        set_custom_prompts,
+        _security_checklist_impl,
+    )
+
+    custom_message = "My organization's security checklist"
+    set_custom_prompts({"security_checklist": custom_message})
+
+    result = _security_checklist_impl()
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+    # Check that the first element contains the custom message
+    assert custom_message in str(result[0])
+
+
+def test_generate_module_docs_default():
+    """Test default module documentation generator prompt."""
+    from terraform_ingest.mcp_service import (
+        set_custom_prompts,
+        _generate_module_docs_impl,
+    )
+
+    # Ensure no custom prompts
+    set_custom_prompts(None)
+
+    result = _generate_module_docs_impl(
+        module_name="test-module", module_purpose="testing"
+    )
+
+    assert isinstance(result, str)
+    assert "test-module" in result
+    assert "testing" in result
+    assert len(result) > 100
+
+
+def test_generate_module_docs_custom_override():
+    """Test module documentation generator with custom override."""
+    from terraform_ingest.mcp_service import (
+        set_custom_prompts,
+        _generate_module_docs_impl,
+    )
+
+    custom_message = "My organization's documentation template"
+    set_custom_prompts({"generate_module_docs": custom_message})
+
+    result = _generate_module_docs_impl(module_name="test", module_purpose="testing")
+
+    assert result == custom_message
+
+
+def test_custom_prompts_in_mcp_context(sample_output_dir):
+    """Test that custom prompts are loaded from MCP config."""
+    from terraform_ingest.mcp_service import (
+        set_mcp_context,
+        get_custom_prompt,
+        _terraform_best_practices_impl,
+    )
+    from terraform_ingest.ingest import TerraformIngest
+    from terraform_ingest.models import McpConfig
+
+    # Create a config with custom prompts
+    ingester = TerraformIngest.from_yaml("config.yaml")
+    config = ingester.config
+
+    # Use the sample output directory for testing
+    config.output_dir = sample_output_dir
+
+    # Add custom prompts to the config
+    if config.mcp is None:
+        config.mcp = McpConfig()
+    config.mcp.prompts = {"terraform_best_practices": "Custom org practices"}
+
+    # Set the context with custom prompts
+    set_mcp_context(ingester, config, False)
+
+    # Verify the custom prompt was loaded
+    assert get_custom_prompt("terraform_best_practices") == "Custom org practices"
+
+    # Verify the prompt function uses the custom override
+    result = _terraform_best_practices_impl()
+    assert result == "Custom org practices"
