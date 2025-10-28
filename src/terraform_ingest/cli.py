@@ -366,7 +366,15 @@ def init(config_file):
     default=10,
     help="Number of results to return",
 )
-def search(query, config, provider, repository, limit):
+@click.option(
+    "--json",
+    "-j",
+    "output_json",
+    is_flag=True,
+    default=False,
+    help="Output results in JSON format",
+)
+def search(query, config, provider, repository, limit, output_json):
     """Search the vector database for Terraform modules.
 
     QUERY: Search query (natural language or keywords)
@@ -376,6 +384,8 @@ def search(query, config, provider, repository, limit):
         terraform-ingest search "vpc module for aws"
 
         terraform-ingest search "kubernetes" --provider aws --limit 5
+
+        terraform-ingest search "vpc" --json
     """
     click.echo(f"Searching for: {query}")
 
@@ -384,13 +394,15 @@ def search(query, config, provider, repository, limit):
         ingester = TerraformIngest.from_yaml(config)
 
         if not ingester.vector_db:
-            click.echo(
-                "Error: Vector database is not enabled in the configuration", err=True
-            )
-            click.echo(
-                "Enable it by setting 'embedding.enabled: true' in your config file",
-                err=True,
-            )
+            error_msg = "Error: Vector database is not enabled in the configuration"
+            if output_json:
+                click.echo(json.dumps({"error": error_msg}))
+            else:
+                click.echo(error_msg, err=True)
+                click.echo(
+                    "Enable it by setting 'embedding.enabled: true' in your config file",
+                    err=True,
+                )
             raise click.Abort()
 
         # Prepare filters
@@ -406,23 +418,39 @@ def search(query, config, provider, repository, limit):
         )
 
         if not results:
-            click.echo("No results found")
+            if output_json:
+                click.echo(json.dumps({"results": [], "count": 0}))
+            else:
+                click.echo("No results found")
             return
 
-        click.echo(f"\nFound {len(results)} result(s):\n")
+        if output_json:
+            # Output as JSON
+            json_output = {
+                "query": query,
+                "count": len(results),
+                "results": results,
+            }
+            click.echo(json.dumps(json_output, indent=2))
+        else:
+            # Output as formatted text
+            click.echo(f"\nFound {len(results)} result(s):\n")
 
-        for i, result in enumerate(results, 1):
-            metadata = result.get("metadata", {})
-            click.echo(f"{i}. {metadata.get('repository', 'Unknown')}")
-            click.echo(f"   Ref: {metadata.get('ref', 'Unknown')}")
-            click.echo(f"   Path: {metadata.get('path', '.')}")
-            click.echo(f"   Provider: {metadata.get('provider', 'Unknown')}")
-            if result.get("distance") is not None:
-                click.echo(f"   Relevance: {1.0 - result['distance']:.3f}")
-            click.echo()
+            for i, result in enumerate(results, 1):
+                metadata = result.get("metadata", {})
+                click.echo(f"{i}. {metadata.get('repository', 'Unknown')}")
+                click.echo(f"   Ref: {metadata.get('ref', 'Unknown')}")
+                click.echo(f"   Path: {metadata.get('path', '.')}")
+                click.echo(f"   Provider: {metadata.get('provider', 'Unknown')}")
+                if result.get("distance") is not None:
+                    click.echo(f"   Relevance: {1.0 - result['distance']:.3f}")
+                click.echo()
 
     except Exception as e:
-        click.echo(f"Error during search: {e}", err=True)
+        if output_json:
+            click.echo(json.dumps({"error": str(e)}))
+        else:
+            click.echo(f"Error during search: {e}", err=True)
         raise click.Abort()
 
 
