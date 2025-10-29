@@ -19,13 +19,11 @@ Or, if you just want the goods on using this as an MCP server along with some ex
 
 ## Installation
 
-This application can be run locally as a CLI, API service, or MCP server using uv or docker.
+This application can be run locally using uv or docker.
+
+> **NOTE** `uv` is required for lazy-loading some large dependencies.
 
 ```bash
-# simple pip install (less preferred)
-pip install terraform-ingest
-
-## UV (preferred)
 uv tool install terraform-ingest
 
 # Create a config

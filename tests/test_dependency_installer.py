@@ -1,5 +1,6 @@
 """Tests for the dependency installer module."""
 
+import subprocess
 import pytest
 from unittest.mock import patch, MagicMock
 from terraform_ingest.dependency_installer import (
@@ -51,6 +52,45 @@ class TestDependencyInstaller:
         assert "openai" in DependencyInstaller.STRATEGY_PACKAGES
         assert "claude" in DependencyInstaller.STRATEGY_PACKAGES
         assert "chromadb-default" in DependencyInstaller.STRATEGY_PACKAGES
+
+    @patch("subprocess.run")
+    def test_install_packages_with_uv_system_flag_success(self, mock_run):
+        """Test successful installation with uv --system flag for tool installations."""
+        # First call with --system succeeds
+        mock_run.return_value = MagicMock(returncode=0)
+
+        with patch.object(
+            DependencyInstaller, "get_missing_packages", return_value=["sentence-transformers"]
+        ):
+            success = DependencyInstaller.install_packages(
+                ["sentence-transformers"], use_uv=True
+            )
+
+        assert success is True
+        # Verify that uv pip install --system was attempted
+        call_args = mock_run.call_args_list[0]
+        assert "uv" in call_args[0][0]
+        assert "--system" in call_args[0][0]
+
+    @patch("subprocess.run")
+    def test_install_packages_with_uv_fallback_to_pip(self, mock_run):
+        """Test fallback to regular uv pip install when --system fails."""
+        # First call with --system fails, second with regular uv pip install succeeds
+        mock_run.side_effect = [
+            subprocess.CalledProcessError(1, "uv"),  # --system fails
+            MagicMock(returncode=0),  # regular uv pip install succeeds
+        ]
+
+        with patch.object(
+            DependencyInstaller, "get_missing_packages", return_value=["sentence-transformers"]
+        ):
+            success = DependencyInstaller.install_packages(
+                ["sentence-transformers"], use_uv=True
+            )
+
+        assert success is True
+        # Verify both approaches were tried
+        assert mock_run.call_count >= 1
 
     @patch("subprocess.run")
     def test_install_packages_with_uv_success(self, mock_run):
