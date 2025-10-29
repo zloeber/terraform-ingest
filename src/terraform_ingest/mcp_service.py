@@ -758,6 +758,72 @@ def search_modules_vector(
         return [{"error": str(e), "message": "Failed to search vector database"}]
 
 
+@mcp.tool()
+def get_module_by_index_id(
+    doc_id: str, output_dir: str = "./output"
+) -> Optional[Dict[str, Any]]:
+    """Retrieves full module information by its index document ID.
+
+    This tool looks up module information using the document ID returned from
+    vector search results. It returns the complete module summary including
+    variables, outputs, providers, and README content.
+
+    Args:
+        doc_id: Document ID (SHA256 hash from vector search or index)
+        output_dir: Directory containing module JSON files (default: ./output)
+
+    Returns:
+        Complete module summary dictionary including:
+        - repository: Git repository URL
+        - ref: Branch or tag name
+        - path: Path within repository
+        - description: Module description
+        - variables: List of input variables with type, default, and description
+        - outputs: List of outputs with description and sensitive flag
+        - providers: List of required Terraform providers with versions
+        - modules: List of sub-modules used
+        - readme_content: Full README file content
+        Or None if the module is not found.
+    """
+    try:
+        from terraform_ingest.indexer import ModuleIndexer
+
+        indexer = ModuleIndexer(output_dir)
+
+        # Check if module exists in index
+        module_entry = indexer.get_module(doc_id)
+        if not module_entry:
+            return {
+                "error": f"Module with ID '{doc_id}' not found in index",
+                "doc_id": doc_id,
+            }
+
+        # Get the path to the summary file
+        summary_path = indexer.get_module_summary_path(doc_id)
+        if not summary_path or not summary_path.exists():
+            return {
+                "error": f"Module summary file not found at {summary_path}",
+                "doc_id": doc_id,
+            }
+
+        # Load and return the full module summary
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = json.load(f)
+
+        return summary
+
+    except json.JSONDecodeError:
+        return {
+            "error": "Invalid JSON in module summary file",
+            "doc_id": doc_id,
+        }
+    except Exception as e:
+        return {
+            "error": f"Failed to retrieve module: {str(e)}",
+            "doc_id": doc_id,
+        }
+
+
 # @mcp.tool()
 # def list_module_resource_uris(output_dir: str = "./output") -> List[Dict[str, Any]]:
 #     """Lists all ingested modules with their MCP resource URIs.

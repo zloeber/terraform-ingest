@@ -11,7 +11,5 @@ This project uses uv + hatch + hatch-vcs for building and automatic versioning. 
 Before submitting a pull request run the following and clean any errors that come up:
 
 ```bash
-task format
-task lint:fix
-task test
+task test format lint:fix
 ```
