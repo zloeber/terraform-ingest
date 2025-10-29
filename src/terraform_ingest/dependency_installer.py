@@ -89,7 +89,7 @@ class DependencyInstaller:
                 # Approach 2: uv pip install without --system (for venv)
                 ["uv", "pip", "install"] + still_missing,
             ]
-            
+
             for uv_cmd in uv_approaches:
                 try:
                     logger.debug(f"Using '{' '.join(uv_cmd[:3])}' to install packages")
@@ -106,9 +106,9 @@ class DependencyInstaller:
                     logger.debug(f"uv approach failed: {e.stderr}")
                     continue
                 except (FileNotFoundError, subprocess.TimeoutExpired):
-                    logger.debug(f"uv command not available or timed out")
+                    logger.debug("uv command not available or timed out")
                     break
-            
+
             logger.debug("All uv approaches failed, falling back to pip")
 
         # Fall back to pip (try different approaches)

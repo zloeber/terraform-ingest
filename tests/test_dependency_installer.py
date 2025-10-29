@@ -60,7 +60,9 @@ class TestDependencyInstaller:
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.object(
-            DependencyInstaller, "get_missing_packages", return_value=["sentence-transformers"]
+            DependencyInstaller,
+            "get_missing_packages",
+            return_value=["sentence-transformers"],
         ):
             success = DependencyInstaller.install_packages(
                 ["sentence-transformers"], use_uv=True
@@ -82,7 +84,9 @@ class TestDependencyInstaller:
         ]
 
         with patch.object(
-            DependencyInstaller, "get_missing_packages", return_value=["sentence-transformers"]
+            DependencyInstaller,
+            "get_missing_packages",
+            return_value=["sentence-transformers"],
         ):
             success = DependencyInstaller.install_packages(
                 ["sentence-transformers"], use_uv=True
