@@ -203,6 +203,52 @@ for result in results:
     print(f"Summary: {summary_path}")
 ```
 
+### MCP Tool Integration
+
+The module index is exposed via MCP (Model Context Protocol) tool for AI agents:
+
+**`get_module_by_index_id(doc_id, output_dir="./output")`**
+
+Retrieves full module information by its index document ID.
+
+```python
+# Use the MCP tool programmatically
+from terraform_ingest.mcp_service import get_module_by_index_id
+
+# Get full module details from vector search result
+vector_result = vector_db.search("VPC module")[0]
+doc_id = vector_result["id"]
+
+module_summary = get_module_by_index_id(doc_id)
+print(f"Module: {module_summary['repository']}")
+print(f"Variables: {[v['name'] for v in module_summary['variables']]}")
+print(f"Outputs: {[o['name'] for o in module_summary['outputs']]}")
+```
+
+**Example Workflow with Vector Search:**
+
+1. AI agent performs vector search for VPC modules
+2. Gets results with document IDs
+3. Calls `get_module_by_index_id(doc_id)` to retrieve full module details
+4. Analyzes variables, outputs, and README to generate Terraform code
+
+```python
+# Typical AI agent workflow
+search_results = search_modules_vector("VPC with subnets and NAT gateway")
+
+for result in search_results:
+    doc_id = result["id"]
+    module = get_module_by_index_id(doc_id)
+    
+    # Now the agent has full module information
+    print(f"Repository: {module['repository']}")
+    print(f"Version: {module['ref']}")
+    print(f"Required Inputs: {[v['name'] for v in module['variables'] if v['required']]}")
+    print(f"Available Outputs: {[o['name'] for o in module['outputs']]}")
+    
+    # Use this to generate Terraform code...
+```
+
 ## Module Index Structure
 
 ### ModuleIndexer Class
