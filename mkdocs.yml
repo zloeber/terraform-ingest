@@ -11,6 +11,8 @@ nav:
   - 'Development': development.md
   - 'Vector Database': vectordb.md
   - 'Vector Embeddings': embeddings.md
+  - 'Ingestion Indexing': module_indexing.md
+  - 'CLI Documentation': cli.md
   - 'MCP': mcp.md
   - 'MCP Usage Examples': mcp_use_examples.md
   - 'Docker': docker.md
