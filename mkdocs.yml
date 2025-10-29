@@ -8,7 +8,7 @@ theme:
 nav:
   - 'Home': index.md
   - 'Quickstart': quickstart.md
-  - 'Development': development.md
+  - 'Development': dev.md
   - 'Vector Database': vectordb.md
   - 'Vector Embeddings': embeddings.md
   - 'Ingestion Indexing': module_indexing.md
