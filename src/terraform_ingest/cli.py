@@ -12,7 +12,8 @@ from terraform_ingest.ingest import TerraformIngest
 from terraform_ingest.models import IngestConfig
 from terraform_ingest import __version__, CONFIG_PATH
 from terraform_ingest.mcp_service import start as mcp_main
-from terraform_ingest.mcp_service import _get_module_resource_impl
+from terraform_ingest.mcp_service import _get_module_resource_impl, ModuleQueryService
+from terraform_ingest.indexer import ModuleIndexer
 
 
 @click.group()
@@ -387,8 +388,6 @@ def search(query, config, provider, repository, limit, output_json):
 
         terraform-ingest search "vpc" --json
     """
-    click.echo(f"Searching for: {query}")
-
     try:
         # Load config to get vector DB settings
         ingester = TerraformIngest.from_yaml(config)
@@ -451,6 +450,153 @@ def search(query, config, provider, repository, limit, output_json):
             click.echo(json.dumps({"error": str(e)}))
         else:
             click.echo(f"Error during search: {e}", err=True)
+        raise click.Abort()
+
+
+@cli.command()
+@click.argument("repository")
+@click.argument("ref")
+@click.option(
+    "--path",
+    "-p",
+    default=".",
+    help="Module path within the repository (default: root)",
+)
+@click.option(
+    "--json",
+    "-j",
+    "output_json",
+    is_flag=True,
+    default=False,
+    help="Output results in JSON format",
+)
+@click.option(
+    "--output-dir",
+    "-o",
+    default=None,
+    help="Directory containing ingested JSON modules (default: ./output)",
+)
+def module(repository, ref, path, output_json, output_dir):
+    """Display ingested module data.
+
+    REPOSITORY: Repository name or URL identifier
+    REF: Git reference (branch, tag, or commit)
+
+    Example:
+
+        terraform-ingest module terraform-aws-vpc v5.0.0
+
+        terraform-ingest module aws-s3 main --path ./modules/bucket
+
+        terraform-ingest module terraform-aws-vpc v5.0.0 --json
+
+        terraform-ingest module terraform-aws-vpc v5.0.0 -o /path/to/output
+    """
+    try:
+        # Determine output directory
+        if output_dir is None:
+            output_dir = os.getenv("TERRAFORM_INGEST_OUTPUT_DIR", "./output")
+
+        output_path = Path(output_dir)
+        if not output_path.exists():
+            error_msg = f"Output directory not found: {output_dir}"
+            if output_json:
+                click.echo(json.dumps({"error": error_msg}))
+            else:
+                click.echo(error_msg, err=True)
+            raise click.Abort()
+
+        # Create a module query service
+        service = ModuleQueryService(output_dir=output_dir)
+
+        # Get the module data
+        module_data = service.get_module(repository, ref, path, include_readme=False)
+
+        if module_data is None:
+            error_msg = f"Module not found: {repository} @ {ref} (path: {path})"
+            if output_json:
+                click.echo(json.dumps({"error": error_msg}))
+            else:
+                click.echo(error_msg, err=True)
+            raise click.Abort()
+
+        if output_json:
+            # Output as JSON
+            click.echo(json.dumps(module_data, indent=2, default=str))
+        else:
+            # Output as formatted text
+            # Display module information
+            click.echo(f"\n📦 Module: {module_data.get('repository', 'Unknown')}")
+            click.echo(f"📍 Ref: {module_data.get('ref', 'Unknown')}")
+            if module_data.get("path") and module_data.get("path") != ".":
+                click.echo(f"📂 Path: {module_data.get('path', 'Unknown')}")
+            click.echo()
+
+            # Display description if available
+            if "description" in module_data and module_data["description"]:
+                click.echo(f"Description: {module_data['description']}\n")
+
+            # Display providers
+            if "providers" in module_data and module_data["providers"]:
+                click.echo("Providers:")
+                for provider in module_data["providers"]:
+                    provider_name = provider.get("name", "Unknown")
+                    provider_version = provider.get("version", "Unknown")
+                    click.echo(f"  - {provider_name} ({provider_version})")
+                click.echo()
+
+            # Display variables
+            if "variables" in module_data and module_data["variables"]:
+                click.echo("Input Variables:")
+                for var in module_data["variables"]:
+                    var_name = var.get("name", "Unknown")
+                    var_type = var.get("type", "Unknown")
+                    var_desc = var.get("description", "")
+                    default = var.get("default")
+                    required = var.get("required", False)
+                    click.echo(
+                        f"  - {var_name} ({var_type})"
+                        + (" [required]" if required else "")
+                    )
+                    if var_desc:
+                        click.echo(f"    {var_desc}")
+                    if default is not None:
+                        click.echo(f"    Default: {default}")
+                click.echo()
+
+            # Display outputs
+            if "outputs" in module_data and module_data["outputs"]:
+                click.echo("Outputs:")
+                for output in module_data["outputs"]:
+                    output_name = output.get("name", "Unknown")
+                    output_desc = output.get("description", "")
+                    click.echo(f"  - {output_name}")
+                    if output_desc:
+                        click.echo(f"    {output_desc}")
+                click.echo()
+
+            # Display modules (sub-modules)
+            if "modules" in module_data and module_data["modules"]:
+                click.echo("Sub-modules:")
+                for submod in module_data["modules"]:
+                    submod_name = submod.get("name", "Unknown")
+                    submod_source = submod.get("source", "Unknown")
+                    click.echo(f"  - {submod_name}: {submod_source}")
+                click.echo()
+
+            # Display resources summary
+            if "resources" in module_data and module_data["resources"]:
+                click.echo(
+                    f"Resources: {len(module_data['resources'])} managed resource(s)"
+                )
+                click.echo()
+
+    except Exception as e:
+        error_msg = f"Error retrieving module: {e}"
+        if output_json:
+            click.echo(json.dumps({"error": error_msg}))
+        else:
+            click.echo(error_msg, err=True)
         raise click.Abort()
 
 
@@ -859,6 +1005,268 @@ def exec(function_name, arg, output_dir, format):
 
     except Exception as e:
         click.echo(f"Error executing function '{function_name}': {e}", err=True)
+        raise click.Abort()
+
+
+@cli.group()
+def index():
+    """Manage the module index for fast lookups."""
+    pass
+
+
+@index.command()
+@click.option(
+    "--output-dir",
+    default="./output",
+    type=click.Path(),
+    help="Output directory with module JSON files",
+)
+def rebuild(output_dir):
+    """Rebuild the module index from all JSON files."""
+    try:
+        indexer = ModuleIndexer(output_dir)
+        count = indexer.rebuild_from_files()
+        click.echo(f"✓ Index rebuilt with {count} modules")
+    except Exception as e:
+        click.echo(f"Error rebuilding index: {e}", err=True)
+        raise click.Abort()
+
+
+@index.command()
+@click.option(
+    "--output-dir",
+    default="./output",
+    type=click.Path(),
+    help="Output directory with module JSON files",
+)
+def stats(output_dir):
+    """Show module index statistics."""
+    try:
+        indexer = ModuleIndexer(output_dir)
+        stats_data = indexer.get_stats()
+        click.echo("\n📊 Module Index Statistics:")
+        click.echo(f"  Total Modules: {stats_data['total_modules']}")
+        click.echo(f"  Unique Providers: {stats_data['unique_providers']}")
+        if stats_data["providers"]:
+            click.echo(f"  Providers: {', '.join(stats_data['providers'])}")
+        click.echo(f"  Unique Tags: {stats_data['unique_tags']}")
+        click.echo(f"  Index File: {stats_data['index_file']}\n")
+    except Exception as e:
+        click.echo(f"Error getting index stats: {e}", err=True)
+        raise click.Abort()
+
+
+@index.command()
+@click.argument("doc_id")
+@click.option(
+    "--output-dir",
+    default="./output",
+    type=click.Path(),
+    help="Output directory with module JSON files",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def lookup(doc_id, output_dir, output_json):
+    """Look up a module by its document ID."""
+    try:
+        indexer = ModuleIndexer(output_dir)
+        module = indexer.get_module(doc_id)
+
+        if not module:
+            click.echo(f"Error: Module with ID '{doc_id}' not found", err=True)
+            raise click.Abort()
+
+        if output_json:
+            click.echo(json.dumps(module, indent=2))
+        else:
+            click.echo(f"\n📦 Module: {doc_id}")
+            click.echo(f"  Repository: {module['repository']}")
+            click.echo(f"  Ref: {module['ref']}")
+            click.echo(f"  Path: {module['path']}")
+            click.echo(f"  Provider: {module['provider']}")
+            click.echo(f"  Summary File: {module['summary_file']}")
+            if module.get("tags"):
+                click.echo(f"  Tags: {', '.join(module['tags'])}")
+            click.echo()
+    except Exception as e:
+        click.echo(f"Error looking up module: {e}", err=True)
+        raise click.Abort()
+
+
+@index.command()
+@click.argument("provider")
+@click.option(
+    "--output-dir",
+    default="./output",
+    type=click.Path(),
+    help="Output directory with module JSON files",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def by_provider(provider, output_dir, output_json):
+    """Search modules by provider."""
+    try:
+        indexer = ModuleIndexer(output_dir)
+        results = indexer.search_by_provider(provider)
+
+        if not results:
+            click.echo(f"No modules found for provider '{provider}'")
+            return
+
+        if output_json:
+            click.echo(json.dumps(results, indent=2))
+        else:
+            click.echo(
+                f"\n🔍 Found {len(results)} module(s) for provider '{provider}':\n"
+            )
+            for module in results:
+                click.echo(f"  • {module['repository']} ({module['ref']})")
+                click.echo(f"    Path: {module['path']}")
+                click.echo(f"    ID: {module['id']}\n")
+    except Exception as e:
+        click.echo(f"Error searching by provider: {e}", err=True)
+        raise click.Abort()
+
+
+@index.command()
+@click.argument("tag")
+@click.option(
+    "--output-dir",
+    default="./output",
+    type=click.Path(),
+    help="Output directory with module JSON files",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def by_tag(tag, output_dir, output_json):
+    """Search modules by tag."""
+    try:
+        indexer = ModuleIndexer(output_dir)
+        results = indexer.search_by_tag(tag)
+
+        if not results:
+            click.echo(f"No modules found with tag '{tag}'")
+            return
+
+        if output_json:
+            click.echo(json.dumps(results, indent=2))
+        else:
+            click.echo(f"\n🏷️  Found {len(results)} module(s) with tag '{tag}':\n")
+            for module in results:
+                click.echo(f"  • {module['repository']} ({module['ref']})")
+                click.echo(f"    Path: {module['path']}")
+                click.echo(f"    ID: {module['id']}\n")
+    except Exception as e:
+        click.echo(f"Error searching by tag: {e}", err=True)
+        raise click.Abort()
+
+
+@index.command()
+@click.argument("doc_id")
+@click.option(
+    "--output-dir",
+    default="./output",
+    type=click.Path(),
+    help="Output directory with module JSON files",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def get(doc_id, output_dir, output_json):
+    """Get full module summary by index ID."""
+    try:
+        indexer = ModuleIndexer(output_dir)
+        module_entry = indexer.get_module(doc_id)
+
+        if not module_entry:
+            click.echo(f"Error: Module with ID '{doc_id}' not found in index", err=True)
+            raise click.Abort()
+
+        # Get the path to the summary file
+        summary_path = indexer.get_module_summary_path(doc_id)
+
+        if not summary_path or not summary_path.exists():
+            click.echo(
+                f"Error: Module index entry found but summary file not found at {summary_path}",
+                err=True,
+            )
+            raise click.Abort()
+
+        # Load the full module summary
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = json.load(f)
+
+        if output_json:
+            click.echo(json.dumps(summary, indent=2))
+        else:
+            click.echo(f"\n📄 Module Summary for ID: {doc_id}\n")
+            click.echo(f"Repository: {summary.get('repository', 'N/A')}")
+            click.echo(f"Ref: {summary.get('ref', 'N/A')}")
+            click.echo(f"Path: {summary.get('path', 'N/A')}")
+            click.echo(f"Description: {summary.get('description', 'N/A')}\n")
+
+            # Show providers
+            if summary.get("providers"):
+                click.echo("Providers:")
+                for provider in summary["providers"]:
+                    click.echo(
+                        f"  • {provider.get('name', 'unknown')} "
+                        f"({provider.get('source', 'unknown')})"
+                    )
+                click.echo()
+
+            # Show variables
+            if summary.get("variables"):
+                click.echo(f"Variables ({len(summary['variables'])}):")
+                for var in summary["variables"]:
+                    required = " (required)" if var.get("required") else ""
+                    click.echo(f"  • {var.get('name', 'unknown')}{required}")
+                    if var.get("description"):
+                        click.echo(f"    Description: {var['description']}")
+                    if var.get("type"):
+                        click.echo(f"    Type: {var['type']}")
+                click.echo()
+
+            # Show outputs
+            if summary.get("outputs"):
+                click.echo(f"Outputs ({len(summary['outputs'])}):")
+                for output in summary["outputs"]:
+                    click.echo(f"  • {output.get('name', 'unknown')}")
+                    if output.get("description"):
+                        click.echo(f"    Description: {output['description']}")
+                click.echo()
+
+            # Show README preview
+            if summary.get("readme_content"):
+                readme = summary["readme_content"]
+                lines = readme.split("\n")[:10]
+                click.echo("README Preview:")
+                for line in lines:
+                    click.echo(f"  {line}")
+                if len(summary["readme_content"].split("\n")) > 10:
+                    click.echo("  ...")
+                click.echo()
+
+    except json.JSONDecodeError:
+        click.echo("Error: Invalid JSON in module summary file", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"Error retrieving module summary: {e}", err=True)
         raise click.Abort()
 
 

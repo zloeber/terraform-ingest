@@ -8,6 +8,7 @@ import yaml
 from terraform_ingest.models import IngestConfig, TerraformModuleSummary
 from terraform_ingest.repository import RepositoryManager
 from terraform_ingest.embeddings import VectorDBManager
+from terraform_ingest.indexer import ModuleIndexer
 from terraform_ingest.logging import get_logger
 from terraform_ingest.dependency_installer import ensure_embeddings_available
 
@@ -46,6 +47,9 @@ class TerraformIngest:
         self.vector_db = None
         if config.embedding and config.embedding.enabled:
             self.vector_db = VectorDBManager(config.embedding)
+
+        # Initialize module indexer for fast lookups
+        self.indexer = ModuleIndexer(config.output_dir)
 
     @classmethod
     def from_yaml(
@@ -89,6 +93,9 @@ class TerraformIngest:
             for summary in summaries:
                 self._save_summary(summary)
 
+        # Save the module index after all modules are processed
+        self.finalize_index()
+
         return all_summaries
 
     def _save_summary(self, summary: TerraformModuleSummary):
@@ -118,6 +125,13 @@ class TerraformIngest:
             json.dump(summary.model_dump(), f, indent=2, default=str)
         self.logger.info(f"Saved summary to {output_path}")
 
+        # Add to module index
+        try:
+            doc_id = self.indexer.add_module(summary)
+            self.logger.debug(f"Added module to index with ID: {doc_id}")
+        except Exception as e:
+            self.logger.warning(f"Failed to add module to index: {e}")
+
         # Upsert to vector database if enabled
         if self.vector_db:
             try:
@@ -125,6 +139,18 @@ class TerraformIngest:
                 self.logger.info(f"Upserted to vector database with ID: {doc_id}")
             except Exception as e:
                 self.logger.warning(f"Failed to upsert to vector database: {e}")
+
+    def finalize_index(self) -> None:
+        """Save the module index after ingestion is complete."""
+        try:
+            self.indexer.save()
+            stats = self.indexer.get_stats()
+            self.logger.info(
+                f"Module index saved with {stats['total_modules']} modules "
+                f"across {stats['unique_providers']} providers"
+            )
+        except Exception as e:
+            self.logger.warning(f"Failed to save module index: {e}")
 
     def get_all_summaries_json(self) -> str:
         """Get all summaries as a single JSON string."""
