@@ -83,22 +83,33 @@ class DependencyInstaller:
 
         # Try uv first if it's available
         if use_uv:
-            try:
-                logger.debug("Using 'uv pip install' to install packages")
-                _ = subprocess.run(
-                    ["uv", "pip", "install"] + still_missing,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=300,
-                )
-                logger.info("Successfully installed packages using uv")
-                return True
-            except subprocess.CalledProcessError as e:
-                logger.warning(f"Failed to install with uv: {e.stderr}")
-                logger.debug("Falling back to pip")
-            except (FileNotFoundError, subprocess.TimeoutExpired):
-                logger.debug("uv not available or timed out, falling back to pip")
+            uv_approaches = [
+                # Approach 1: uv pip install with --system (for uv tool installations)
+                ["uv", "pip", "install", "--system"] + still_missing,
+                # Approach 2: uv pip install without --system (for venv)
+                ["uv", "pip", "install"] + still_missing,
+            ]
+
+            for uv_cmd in uv_approaches:
+                try:
+                    logger.debug(f"Using '{' '.join(uv_cmd[:3])}' to install packages")
+                    _ = subprocess.run(
+                        uv_cmd,
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=300,
+                    )
+                    logger.info("Successfully installed packages using uv")
+                    return True
+                except subprocess.CalledProcessError as e:
+                    logger.debug(f"uv approach failed: {e.stderr}")
+                    continue
+                except (FileNotFoundError, subprocess.TimeoutExpired):
+                    logger.debug("uv command not available or timed out")
+                    break
+
+            logger.debug("All uv approaches failed, falling back to pip")
 
         # Fall back to pip (try different approaches)
         pip_approaches = [
@@ -135,10 +146,15 @@ class DependencyInstaller:
         # All approaches failed
         logger.error(
             f"Failed to install packages using any method.\n\n"
-            f"Please install manually with:\n"
-            f"  pip install {' '.join(still_missing)}\n"
-            f"Or with uv:\n"
-            f"  uv add {' '.join(still_missing)}\n\n"
+            f"Please install manually with one of these methods:\n\n"
+            f"  Option 1 (pip):\n"
+            f"    pip install {' '.join(still_missing)}\n\n"
+            f"  Option 2 (uv with system packages):\n"
+            f"    uv pip install --system {' '.join(still_missing)}\n\n"
+            f"  Option 3 (uv add via pyproject):\n"
+            f"    uv add {' '.join(still_missing)}\n\n"
+            f"  Option 4 (reinstall tool with extras):\n"
+            f"    uv tool install --force terraform-ingest[embeddings]\n\n"
             f"You may also need to upgrade pip:\n"
             f"  python -m pip install --upgrade pip"
         )
