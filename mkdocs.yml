@@ -45,7 +45,7 @@ plugins:
       Usage:
       - index.md: Index
       - quickstart.md: Quickstart Guide
-      - development.md: Development Guide
+      - dev.md: Development Guide
       - vectordb.md: Vector Database Setup
       - embeddings.md: Vector Database Embeddings
       - mcp.md: MCP Server usage
