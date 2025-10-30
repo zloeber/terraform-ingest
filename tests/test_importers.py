@@ -141,6 +141,10 @@ class TestGitHubImporter:
         """Test _has_terraform_files when rate limited."""
         mock_response = Mock()
         mock_response.status_code = 403
+        mock_response.headers = {
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": "1234567890",
+        }
         mock_get.return_value = mock_response
 
         importer = GitHubImporter(org="test-org")

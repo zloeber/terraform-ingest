@@ -341,6 +341,156 @@ def init(config_file):
 
 
 @cli.command()
+@click.argument(
+    "config_file", type=click.Path(exists=True), default=None, required=False
+)
+@click.option(
+    "--strategy",
+    type=click.Choice(
+        ["openai", "claude", "sentence-transformers", "chromadb-default", "all"]
+    ),
+    default=None,
+    help="Embedding strategy to install dependencies for (overrides config file)",
+)
+@click.option(
+    "--no-auto-install/--auto-install",
+    default=False,
+    help="Skip automatic installation (only report missing packages)",
+)
+def install_deps(config_file, strategy, no_auto_install):
+    """Install optional dependencies for embedding strategies.
+
+    This command manages installation of packages needed for vector database
+    and embedding functionality. It can read from a configuration file or use
+    explicit strategy options.
+
+    If CONFIG_FILE is provided, dependencies will be installed based on the
+    embedding configuration in that file. Otherwise, use --strategy to specify.
+
+    Example:
+
+        # From config file
+        terraform-ingest install-deps config.yaml
+
+        # Explicit strategy
+        terraform-ingest install-deps --strategy sentence-transformers
+
+        # All strategies
+        terraform-ingest install-deps --strategy all
+
+        # Report only (no install)
+        terraform-ingest install-deps config.yaml --no-auto-install
+    """
+    from terraform_ingest.dependency_installer import DependencyInstaller
+    from loguru import logger
+
+    try:
+        packages_to_install = []
+        embedding_strategy = None
+
+        # Determine which packages to install
+        if config_file:
+            # Load from config file
+            click.echo(f"Loading configuration from {config_file}")
+            with open(config_file, "r") as f:
+                config_data = yaml.safe_load(f)
+
+            embedding_config = config_data.get("embedding", {})
+
+            if not embedding_config or not embedding_config.get("enabled", False):
+                click.echo("✓ Embeddings are not enabled in the configuration")
+                return
+
+            embedding_strategy = embedding_config.get("strategy", "chromadb-default")
+            click.echo(f"Embeddings enabled with strategy: {embedding_strategy}")
+
+            # Get packages for the configured strategy
+            packages_to_install = DependencyInstaller.STRATEGY_PACKAGES.get(
+                embedding_strategy, []
+            )
+            if not packages_to_install:
+                click.echo(
+                    f"Error: Unknown embedding strategy '{embedding_strategy}' in config",
+                    err=True,
+                )
+                raise click.Abort()
+
+            # Always include chromadb if a strategy is enabled
+            if "chromadb" not in packages_to_install:
+                packages_to_install = list(packages_to_install) + ["chromadb"]
+
+        elif strategy:
+            # Use explicit strategy
+            if strategy == "all":
+                # Install all embedding packages
+                packages_to_install = DependencyInstaller.EMBEDDING_PACKAGES
+                click.echo("Checking packages for all embedding strategies...")
+            else:
+                # Install packages for specific strategy
+                packages_to_install = DependencyInstaller.STRATEGY_PACKAGES.get(
+                    strategy, []
+                )
+                if not packages_to_install:
+                    click.echo(f"Error: Unknown strategy '{strategy}'", err=True)
+                    raise click.Abort()
+                click.echo(f"Checking packages for '{strategy}' embedding strategy...")
+        else:
+            # No config and no strategy specified - default to all
+            packages_to_install = DependencyInstaller.EMBEDDING_PACKAGES
+            click.echo("No config or strategy specified, checking all packages...")
+
+        # Check for missing packages
+        missing = DependencyInstaller.get_missing_packages(packages_to_install)
+
+        if not missing:
+            click.echo("✓ All required packages are already installed")
+            for pkg in packages_to_install:
+                click.echo(f"  • {pkg}")
+            return
+
+        click.echo(f"\nMissing packages: {', '.join(missing)}")
+        for pkg in missing:
+            click.echo(f"  • {pkg}")
+
+        if no_auto_install:
+            click.echo("\nSkipping automatic installation (--no-auto-install flag set)")
+            click.echo("\nInstall manually with:")
+            click.echo(f"  pip install {' '.join(missing)}")
+            return
+
+        click.echo(f"\nInstalling {len(missing)} package(s)...")
+        success = DependencyInstaller.install_packages(
+            missing,
+            logger=logger,
+            use_uv=True,
+        )
+
+        if success:
+            click.echo("✓ Successfully installed all packages")
+            # Verify installation
+            still_missing = DependencyInstaller.get_missing_packages(
+                packages_to_install
+            )
+            if not still_missing:
+                click.echo("✓ All packages verified")
+                for pkg in packages_to_install:
+                    click.echo(f"  • {pkg}")
+            else:
+                click.echo(
+                    f"⚠ Warning: Some packages still not found: {', '.join(still_missing)}"
+                )
+        else:
+            click.echo("✗ Installation failed", err=True)
+            click.echo("\nTry installing manually with:", err=True)
+            click.echo(f"  pip install {' '.join(missing)}", err=True)
+            raise click.Abort()
+
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+
+@cli.command()
 @click.argument("query")
 @click.option(
     "--config",

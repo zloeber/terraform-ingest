@@ -84,10 +84,10 @@ class DependencyInstaller:
         # Try uv first if it's available
         if use_uv:
             uv_approaches = [
-                # Approach 1: uv pip install with --system (for uv tool installations)
-                ["uv", "pip", "install", "--system"] + still_missing,
-                # Approach 2: uv pip install without --system (for venv)
+                # Approach 1: uv pip install without --system (for venv)
                 ["uv", "pip", "install"] + still_missing,
+                # Approach 2: uv pip install with --system (for uv tool installations)
+                ["uv", "pip", "install", "--system"] + still_missing,
             ]
 
             for uv_cmd in uv_approaches:

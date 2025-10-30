@@ -135,25 +135,58 @@ class GitHubImporter(RepositoryImporter):
         Returns:
             True if repository contains .tf files, False otherwise.
         """
+        repo_name = repo.get("name", repo.get("full_name", "unknown"))
+
         try:
             # Search for .tf files in the repository
             search_url = "https://api.github.com/search/code"
             params = {"q": f"extension:tf repo:{repo['full_name']}", "per_page": 1}
 
             response = requests.get(search_url, headers=self.headers, params=params)
+
             if response.status_code == 200:
                 result = response.json()
                 return result.get("total_count", 0) > 0
             elif response.status_code == 403:
-                # Rate limited or search API not available without auth
-                click.echo(
-                    f"Warning: Cannot check Terraform files for {repo['name']} (rate limited)",
-                    err=True,
-                )
+                # Check rate limit headers to distinguish between rate limiting and auth issues
+                remaining = response.headers.get("X-RateLimit-Remaining", "unknown")
+                reset_time = response.headers.get("X-RateLimit-Reset", "unknown")
+
+                # Check if it's actually a rate limit issue vs auth/permissions issue
+                try:
+                    remaining_int = int(remaining)
+                    if remaining_int == 0:
+                        click.echo(
+                            f"Warning: Cannot check Terraform files for {repo_name} "
+                            f"(GitHub API rate limited - reset at {reset_time})",
+                            err=True,
+                        )
+                        return True  # Include by default if we can't check due to rate limit
+                except (ValueError, TypeError):
+                    pass
+
+                # If remaining is not 0, it's likely a permissions or token scope issue
+                if not self.token:
+                    click.echo(
+                        f"Warning: Cannot check Terraform files for {repo_name} "
+                        f"(GitHub search API requires authentication - use --token or set GITHUB_TOKEN)",
+                        err=True,
+                    )
+                else:
+                    click.echo(
+                        f"Warning: Cannot check Terraform files for {repo_name} "
+                        f"(GitHub search API returned 403 - verify token has required scopes)",
+                        err=True,
+                    )
                 return True  # Include by default if we can't check
             else:
                 return False
-        except Exception:
+        except Exception as e:
+            # Log the exception for debugging but don't fail the whole operation
+            click.echo(
+                f"Warning: Error checking Terraform files for {repo_name}: {e}",
+                err=True,
+            )
             return True  # Include by default if check fails
 
 

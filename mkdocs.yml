@@ -14,6 +14,7 @@ nav:
   - 'Ingestion Indexing': module_indexing.md
   - 'CLI Documentation': cli.md
   - 'Import Command': import.md
+  - 'GitHub Rate Limit Fix': github_rate_limit_fix.md
   - 'MCP': mcp.md
   - 'MCP Usage Examples': mcp_use_examples.md
   - 'Docker': docker.md
