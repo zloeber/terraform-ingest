@@ -1,0 +1,93 @@
+name: Publish to MCP Registry
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+jobs:
+  publish-mcp:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for OIDC authentication
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install MCP Publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          chmod +x mcp-publisher
+
+      - name: Validate server.json against schema
+        run: |
+          # Download the JSON schema
+          curl -s -o server.schema.json "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json"
+          
+          # Install jq for JSON validation
+          sudo apt-get update && sudo apt-get install -y jq
+          
+          # Validate server.json against the schema using jq
+          # First, check if the schema is valid
+          jq empty server.schema.json || { echo "Schema file is not valid JSON"; exit 1; }
+          
+          # Check if server.json is valid
+          jq empty server.json || { echo "server.json is not valid JSON"; exit 1; }
+          
+          # Basic schema validation checks
+          echo "Validating server.json structure..."
+          
+          # Check required fields
+          jq -e '.name' server.json > /dev/null || { echo "Missing required field: name"; exit 1; }
+          jq -e '.title' server.json > /dev/null || { echo "Missing required field: title"; exit 1; }
+          jq -e '.description' server.json > /dev/null || { echo "Missing required field: description"; exit 1; }
+          jq -e '.version' server.json > /dev/null || { echo "Missing required field: version"; exit 1; }
+          jq -e '.["$schema"]' server.json > /dev/null || { echo "Missing required field: \$schema"; exit 1; }
+          
+          # Check that at least one of packages or remotes exists
+          HAS_PACKAGES=$(jq 'has("packages") and (.packages | length) > 0' server.json)
+          HAS_REMOTES=$(jq 'has("remotes") and (.remotes | length) > 0' server.json)
+          if [ "$HAS_PACKAGES" = "false" ] && [ "$HAS_REMOTES" = "false" ]; then
+            echo "Must have either 'packages' or 'remotes' defined"
+            exit 1
+          fi
+          
+          # Validate name format
+          NAME=$(jq -r '.name' server.json)
+          if [[ ! $NAME =~ ^io\.github\.[a-z0-9_-]+/[a-z0-9_-]+$ ]] && [[ ! $NAME =~ ^com\.[a-z0-9_-]+(\.[a-z0-9_-]+)*/[a-z0-9_-]+$ ]]; then
+            echo "Invalid name format: $NAME (must be io.github.username/name or com.company.domain/name)"
+            exit 1
+          fi
+          
+          # Validate description length (max 100 chars)
+          DESC=$(jq -r '.description' server.json)
+          DESC_LEN=${#DESC}
+          if [ $DESC_LEN -gt 100 ]; then
+            echo "Description too long: $DESC_LEN chars (max 100)"
+            exit 1
+          fi
+          
+          echo "✓ server.json validation passed"
+
+      - name: Update server.json version from git tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "Updating server.json version to: $VERSION"
+          jq --arg v "$VERSION" '.version = $v' server.json > tmp.json && mv tmp.json server.json
+          # Also update package versions
+          jq --arg v "$VERSION" '.packages[].version = $v' server.json > tmp.json && mv tmp.json server.json
+          cat server.json
+
+      - name: Login to MCP Registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish
+
+      - name: Verify Publication
+        run: |
+          sleep 2  # Give registry a moment to process
+          SERVER_NAME=$(jq -r '.name' server.json)
+          echo "Verifying publication of $SERVER_NAME..."
+          curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=$SERVER_NAME" | jq .
