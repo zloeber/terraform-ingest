@@ -2,7 +2,7 @@
   "servers": {
     "terraform-ingest-mcp": {
       "command": "uvx",
-      "args": ["terraform-ingest" , "mcp", "-c", "examples/cloudposse.yaml", "--no-ingest-on-startup"]
+      "args": ["terraform-ingest" , "mcp", "-c", "config.yaml", "--no-ingest-on-startup"]
     },
     "terraform": {
       "command": "docker",
