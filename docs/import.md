@@ -272,5 +272,5 @@ If no repositories are found:
 ## See Also
 
 - [CLI Reference](cli.md) - Complete CLI documentation
-- [Configuration](QUICKSTART.md) - Configuration file format
+- [Configuration](quickstart.md) - Configuration file format
 - [Getting Started](index.md) - General usage guide
