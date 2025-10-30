@@ -987,7 +987,7 @@ def list_module_resources_for_discovery() -> List[Dict[str, Any]]:
 
 
 def get_argument_completions_for_resources(
-    argument_name: str, argument_value: str
+    argument_name: str, argument_value: Optional[str] = None
 ) -> List[str]:
     """Get argument completion suggestions for module resource URIs.
 
@@ -996,13 +996,16 @@ def get_argument_completions_for_resources(
 
     Args:
         argument_name: Name of the argument being completed (repository, ref, or path)
-        argument_value: Current value the user is typing
+        argument_value: Current value the user is typing (optional)
 
     Returns:
         List of matching completion suggestions
     """
     service = get_service()
     summaries = service._load_all_summaries()
+
+    # Handle None or empty argument_value
+    search_value = (argument_value or "").lower()
 
     if argument_name == "repository":
         # Suggest repository names (basename from URL)
@@ -1012,7 +1015,7 @@ def get_argument_completions_for_resources(
             if repo_url:
                 # Extract basename and remove .git suffix
                 repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
-                if argument_value.lower() in repo_name.lower():
+                if search_value in repo_name.lower():
                     repos.add(repo_name)
         return sorted(list(repos))
 
@@ -1021,7 +1024,7 @@ def get_argument_completions_for_resources(
         refs = set()
         for summary in summaries:
             ref = summary.get("ref", "")
-            if ref and argument_value.lower() in ref.lower():
+            if ref and search_value in ref.lower():
                 refs.add(ref)
         return sorted(list(refs))
 
@@ -1032,7 +1035,7 @@ def get_argument_completions_for_resources(
             path = summary.get("path", ".")
             # Encode path for URI (replace / with -)
             encoded_path = path.replace("/", "-").replace(".", "-")
-            if argument_value.lower() in encoded_path.lower():
+            if search_value in encoded_path.lower():
                 paths.add(encoded_path)
         return sorted(list(paths))
 

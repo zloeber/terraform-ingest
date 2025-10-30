@@ -287,32 +287,53 @@ def init(config_file):
         raise click.Abort()
 
     sample_config = {
-        "repositories": [
-            {
-                "url": "https://github.com/terraform-aws-modules/terraform-aws-vpc",
-                "name": "terraform-aws-vpc",
-                "branches": ["main", "develop"],
-                "include_tags": True,
-                "max_tags": 1,
-                "path": ".",
-                "recursive": False,
-            },
-            {
-                "url": "https://github.com/terraform-aws-modules/terraform-aws-ec2-instance",
-                "name": "terraform-aws-ec2-instance",
-                "branches": ["main"],
-                "include_tags": True,
-                "max_tags": 3,
-                "path": ".",
-                "recursive": True,
-            },
-        ],
+        "repositories": [],
+        #     {
+        #         "url": "https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        #         "name": "terraform-aws-vpc",
+        #         "branches": ["main", "develop"],
+        #         "include_tags": True,
+        #         "max_tags": 1,
+        #         "path": ".",
+        #         "recursive": False,
+        #     },
+        #     {
+        #         "url": "https://github.com/terraform-aws-modules/terraform-aws-ec2-instance",
+        #         "name": "terraform-aws-ec2-instance",
+        #         "branches": ["main"],
+        #         "include_tags": True,
+        #         "max_tags": 3,
+        #         "path": ".",
+        #         "recursive": True,
+        #     },
+        # ],
         "output_dir": "./output",
         "clone_dir": "./repos",
         "mcp": {
             "auto_ingest": False,
             "ingest_on_startup": False,
             "refresh_interval_hours": None,
+            "instructions": """
+    You have access to a comprehensive Terraform module library via the terraform-ingest MCP service.
+    
+    When a user asks you to find or recommend the best Terraform module for a specific use case:
+    1. First, understand their requirements by asking clarifying questions about:
+       - The cloud provider (aws, azure, gcp, etc.)
+       - The resource type or infrastructure component needed (networking, compute, security, etc.)
+       - Any specific features or constraints
+    
+    2. Then use the "Find Terraform Module" prompt with:
+       - keywords: A concise description of what they need (e.g., "VPC with security groups and NAT gateway")
+       - provider: The cloud provider (e.g., "aws")
+    
+    3. This prompt will guide you to:
+       - Search for relevant modules using search_modules_vector
+       - Retrieve detailed information about each candidate
+       - Compare and recommend the best fit
+       - Provide the module URL, version, variables, and usage summary
+    
+    Use this prompt whenever you're tasked with finding, recommending, or selecting a module.
+"""
         },
         "embedding": {
             "enabled": False,

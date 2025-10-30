@@ -1034,6 +1034,33 @@ def test_get_argument_completions_for_paths(sample_output_dir):
     assert any("-" in c or c == "-" for c in completions)
 
 
+def test_get_argument_completions_for_resources_with_none(sample_output_dir):
+    """Test that argument_completions handles None values correctly."""
+    from terraform_ingest.mcp_service import (
+        get_argument_completions_for_resources,
+        set_mcp_context,
+    )
+    from terraform_ingest.ingest import TerraformIngest
+
+    # Initialize context
+    ingester = TerraformIngest.from_yaml("config.yaml")
+    # Use the sample output directory for testing
+    ingester.config.output_dir = sample_output_dir
+    set_mcp_context(ingester, ingester.config, False)
+
+    # Test with None value - should not raise AttributeError
+    completions = get_argument_completions_for_resources("repository", None)
+    assert isinstance(completions, list)
+
+    # Test with None for ref
+    completions = get_argument_completions_for_resources("ref", None)
+    assert isinstance(completions, list)
+
+    # Test with None for path
+    completions = get_argument_completions_for_resources("path", None)
+    assert isinstance(completions, list)
+
+
 def test_set_custom_prompts():
     """Test setting custom prompt overrides."""
     from terraform_ingest.mcp_service import (
