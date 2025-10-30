@@ -357,8 +357,8 @@ class ModuleQueryService:
             URI string for the module resource
         """
         # Encode path separators for use in URI
-        safe_path = path.replace("/", "-").replace(".", "-")
-        safe_ref = ref.replace("/", "-").replace(".", "-")
+        safe_path = path.replace("/", "-")
+        safe_ref = ref.replace("/", "-")
         safe_repo = (
             repository.rstrip("/").split("/")[-1].replace(".git", "").replace("/", "-")
         )
@@ -481,6 +481,50 @@ class ModuleQueryService:
                     "description": summary.get("description", ""),
                 }
             )
+
+        return result
+
+    def list_module_versions(
+        self, repository: str, path: str = "."
+    ) -> List[Dict[str, Any]]:
+        """Find all module versions for a target repository and path.
+
+        Args:
+            repository: Git repository URL
+            path: Path within the repository (default: "." for root)
+
+        Returns:
+            List of module versions with:
+            - ref: Branch or tag name
+            - module_name: Name extracted from repository
+            - index_id: Unique identifier for the module version (URI)
+            - description: Module description
+            - variables_count: Number of input variables
+            - outputs_count: Number of outputs
+            - resources_count: Number of resources
+        """
+        summaries = self._load_all_summaries()
+        result = []
+
+        for summary in summaries:
+            # Match by repository and path
+            if summary.get("repository") == repository and summary.get("path") == path:
+                module_uri = self._generate_module_uri(
+                    repository,
+                    summary.get("ref", ""),
+                    path,
+                )
+                result.append(
+                    {
+                        "ref": summary.get("ref", ""),
+                        "module_name": self._extract_repo_name(repository),
+                        "index_id": module_uri,
+                        "description": summary.get("description", ""),
+                        "variables_count": len(summary.get("variables", [])),
+                        "outputs_count": len(summary.get("outputs", [])),
+                        "resources_count": len(summary.get("resources", [])),
+                    }
+                )
 
         return result
 
@@ -701,6 +745,37 @@ def list_module_resources(
     """
     service = get_service(output_dir)
     return service.list_module_resources(repository=repository, ref=ref, path=path)
+
+
+@mcp.tool()
+def list_module_versions(
+    repository: str,
+    path: str = ".",
+    output_dir: str = "./output",
+) -> List[Dict[str, Any]]:
+    """Finds all module versions for a target repository and path.
+
+    This tool returns all available versions (branches/tags) of a specific module
+    in a repository, including metadata about each version. Useful for understanding
+    what versions of a module are available and selecting the right one.
+
+    Args:
+        repository: Git repository URL (e.g., "https://github.com/terraform-aws-modules/terraform-aws-vpc")
+        path: Path within the repository where the module is located (default: "." for root)
+        output_dir: Directory containing ingested JSON summaries (default: ./output)
+
+    Returns:
+        List of module versions with:
+        - ref: Branch or tag name
+        - module_name: Name extracted from repository
+        - index_id: Unique identifier for the module version (URI for lookup)
+        - description: Module description
+        - variables_count: Number of input variables
+        - outputs_count: Number of outputs
+        - resources_count: Number of resources
+    """
+    service = get_service(output_dir)
+    return service.list_module_versions(repository=repository, path=path)
 
 
 @mcp.tool()
@@ -1217,8 +1292,8 @@ Create documentation with the following sections:
 
 
 # Prompts for AI agents
-@mcp.prompt(title="Find Best Terraform Module")
-def find_best_terraform_module_prompt(keywords: str, provider: str) -> str:
+@mcp.prompt(title="Find Terraform Module")
+def find_terraform_module_prompt(keywords: str, provider: str) -> str:
     """Generate a prompt to help find a Terraform module.
     This prompt guides users in searching for relevant Terraform modules
     based on their requirements.
@@ -1230,15 +1305,31 @@ def find_best_terraform_module_prompt(keywords: str, provider: str) -> str:
     Returns:
         Prompt string for finding Terraform modules
     """
-    # if _service.vector_db_enabled:
-    #     search_tool = "search_modules_vector"
-    # else:
-    #     search_tool = "search_modules"
     return f"""Use the search_modules_vector tool to find the top 5 Terraform modules related to the following query: {keywords}
-for the {provider} provider. For each module. use the get_module_details tool to retrieve detailed information
-about the module, including its variables, outputs, providers, and README content.
-Summarize the key features of each module and determine the best fit for the user's requirements if any are found.
-Return the module repository URL, ref, path, and a brief summary of why it is a good fit.
+for the {provider} provider. Use the get_module_by_index_id tool to retrieve detailed information about each module found.
+Summarize the key features of each module and determine which, if any, best fits the requirements for the given keywords and provider.
+Return the module repository URL, ref, path, variable details, and a brief summary of why it is a good fit.
+"""
+
+
+@mcp.prompt(title="Update Module")
+def update_terraform_module_prompt(url: str, ref: str, path: str) -> str:
+    """Generate a prompt to help find updates for a Terraform module.
+    This prompt guides users on checking for newer versions or updates
+    to an existing Terraform module and assessing the impact of those updates.
+    Args:
+        url: Git repository URL of the Terraform module
+        ref: Branch or tag name of the Terraform module
+    Returns:
+        Prompt string for finding Terraform module updates and assessing impact
+    """
+    return f"""Use the list_module_versions tool to retrieve all available versions of the Terraform module located at {url} in path {path}.
+Compare the current version {ref} with the latest available version.
+Use the get_module_resource resource template for the current module version and the latest version found to fetch details of both.
+Analyze the differences in variables, outputs, and resources between the two versions.
+Provide a summary of the changes, potential impacts on existing infrastructure,
+and recommendations for upgrading to the latest version. Use this information to guide 
+the update process for your target module block to the latest version.
 """
 
 
