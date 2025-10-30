@@ -1274,14 +1274,14 @@ def get(doc_id, output_dir, output_json):
 @cli.group()
 def import_cmd():
     """Import repositories from external sources into configuration.
-    
+
     This command group allows importing repositories from various sources
     (GitHub, GitLab, etc.) and updating your configuration file.
-    
+
     Example:
-    
+
         terraform-ingest import github --org hashicorp --config config.yaml
-        
+
         terraform-ingest import github --org myorg --terraform-only --replace
     """
     pass
@@ -1335,17 +1335,17 @@ def github(
     replace: bool,
 ) -> None:
     """Import repositories from a GitHub organization.
-    
+
     This command fetches all repositories from a GitHub organization and
     adds them to your configuration file. By default, it merges with existing
     repositories. Use --replace to override the existing list.
-    
+
     Example:
-    
+
         terraform-ingest import github --org hashicorp
-        
+
         terraform-ingest import github --org myorg --token ghp_xxx --terraform-only
-        
+
         terraform-ingest import github --org myorg --replace --config my-config.yaml
     """
     try:

@@ -15,7 +15,7 @@ class RepositoryImporter(ABC):
     @abstractmethod
     def fetch_repositories(self, **kwargs) -> List[RepositoryConfig]:
         """Fetch repositories from the source.
-        
+
         Returns:
             List of RepositoryConfig objects.
         """
@@ -24,7 +24,7 @@ class RepositoryImporter(ABC):
     @abstractmethod
     def get_provider_name(self) -> str:
         """Get the name of the provider.
-        
+
         Returns:
             Provider name (e.g., 'github', 'gitlab').
         """
@@ -43,7 +43,7 @@ class GitHubImporter(RepositoryImporter):
         base_path: str = "./src",
     ):
         """Initialize GitHub importer.
-        
+
         Args:
             org: GitHub organization name
             token: GitHub personal access token
@@ -66,10 +66,10 @@ class GitHubImporter(RepositoryImporter):
 
     def fetch_repositories(self, **kwargs) -> List[RepositoryConfig]:
         """Fetch repositories from GitHub organization.
-        
+
         Returns:
             List of RepositoryConfig objects.
-            
+
         Raises:
             click.ClickException: If there's an error fetching repositories.
         """
@@ -77,7 +77,9 @@ class GitHubImporter(RepositoryImporter):
         page = 1
         per_page = 100
 
-        click.echo(f"Fetching repositories from GitHub organization: {self.org}", err=True)
+        click.echo(
+            f"Fetching repositories from GitHub organization: {self.org}", err=True
+        )
 
         while True:
             url = f"https://api.github.com/orgs/{self.org}/repos"
@@ -126,10 +128,10 @@ class GitHubImporter(RepositoryImporter):
 
     def _has_terraform_files(self, repo: Dict[str, Any]) -> bool:
         """Check if a repository contains Terraform files.
-        
+
         Args:
             repo: Repository data from GitHub API
-            
+
         Returns:
             True if repository contains .tf files, False otherwise.
         """
@@ -161,12 +163,12 @@ def merge_repositories(
     replace: bool = False,
 ) -> List[RepositoryConfig]:
     """Merge new repositories with existing ones.
-    
+
     Args:
         existing_repos: Existing repository configurations
         new_repos: New repository configurations to add
         replace: If True, replace all existing repos. If False, merge.
-        
+
     Returns:
         Merged list of RepositoryConfig objects.
     """
@@ -193,7 +195,7 @@ def update_config_file(
     replace: bool = False,
 ) -> None:
     """Update a configuration file with new repositories.
-    
+
     Args:
         config_path: Path to the configuration file
         new_repos: New repository configurations to add

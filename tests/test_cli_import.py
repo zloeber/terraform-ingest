@@ -3,7 +3,6 @@
 import pytest
 import yaml
 from click.testing import CliRunner
-from pathlib import Path
 from unittest.mock import patch, Mock
 from terraform_ingest.cli import cli
 from terraform_ingest.models import RepositoryConfig
@@ -65,10 +64,12 @@ class TestGitHubImportCommand:
     """Tests for github import subcommand."""
 
     @patch("terraform_ingest.cli.GitHubImporter")
-    def test_github_import_basic(self, mock_importer_class, runner, tmp_path, mock_github_repos):
+    def test_github_import_basic(
+        self, mock_importer_class, runner, tmp_path, mock_github_repos
+    ):
         """Test basic GitHub import."""
         config_file = tmp_path / "test-config.yaml"
-        
+
         # Mock the importer
         mock_importer = Mock()
         mock_importer.fetch_repositories.return_value = mock_github_repos
@@ -98,10 +99,12 @@ class TestGitHubImportCommand:
         assert config["repositories"][0]["name"] == "repo1"
 
     @patch("terraform_ingest.cli.GitHubImporter")
-    def test_github_import_with_token(self, mock_importer_class, runner, tmp_path, mock_github_repos):
+    def test_github_import_with_token(
+        self, mock_importer_class, runner, tmp_path, mock_github_repos
+    ):
         """Test GitHub import with authentication token."""
         config_file = tmp_path / "test-config.yaml"
-        
+
         # Mock the importer
         mock_importer = Mock()
         mock_importer.fetch_repositories.return_value = mock_github_repos
@@ -128,10 +131,12 @@ class TestGitHubImportCommand:
         assert call_kwargs["token"] == "test-token"
 
     @patch("terraform_ingest.cli.GitHubImporter")
-    def test_github_import_merge(self, mock_importer_class, runner, tmp_path, mock_github_repos):
+    def test_github_import_merge(
+        self, mock_importer_class, runner, tmp_path, mock_github_repos
+    ):
         """Test GitHub import with merge (default behavior)."""
         config_file = tmp_path / "test-config.yaml"
-        
+
         # Create initial config with one repository
         initial_config = {
             "repositories": [
@@ -149,7 +154,7 @@ class TestGitHubImportCommand:
             "output_dir": "./output",
             "clone_dir": "./repos",
         }
-        
+
         with open(config_file, "w") as f:
             yaml.dump(initial_config, f)
 
@@ -181,10 +186,12 @@ class TestGitHubImportCommand:
         assert len(config["repositories"]) == 3
 
     @patch("terraform_ingest.cli.GitHubImporter")
-    def test_github_import_replace(self, mock_importer_class, runner, tmp_path, mock_github_repos):
+    def test_github_import_replace(
+        self, mock_importer_class, runner, tmp_path, mock_github_repos
+    ):
         """Test GitHub import with replace flag."""
         config_file = tmp_path / "test-config.yaml"
-        
+
         # Create initial config with one repository
         initial_config = {
             "repositories": [
@@ -201,7 +208,7 @@ class TestGitHubImportCommand:
             ],
             "output_dir": "./output",
         }
-        
+
         with open(config_file, "w") as f:
             yaml.dump(initial_config, f)
 
@@ -235,10 +242,12 @@ class TestGitHubImportCommand:
         assert config["repositories"][0]["name"] == "repo1"
 
     @patch("terraform_ingest.cli.GitHubImporter")
-    def test_github_import_with_options(self, mock_importer_class, runner, tmp_path, mock_github_repos):
+    def test_github_import_with_options(
+        self, mock_importer_class, runner, tmp_path, mock_github_repos
+    ):
         """Test GitHub import with various options."""
         config_file = tmp_path / "test-config.yaml"
-        
+
         # Mock the importer
         mock_importer = Mock()
         mock_importer.fetch_repositories.return_value = mock_github_repos
@@ -261,7 +270,7 @@ class TestGitHubImportCommand:
         )
 
         assert result.exit_code == 0
-        
+
         # Verify importer was initialized with correct options
         mock_importer_class.assert_called_once()
         call_kwargs = mock_importer_class.call_args[1]
@@ -274,7 +283,7 @@ class TestGitHubImportCommand:
     def test_github_import_no_repos(self, mock_importer_class, runner, tmp_path):
         """Test GitHub import when no repositories are found."""
         config_file = tmp_path / "test-config.yaml"
-        
+
         # Mock the importer to return empty list
         mock_importer = Mock()
         mock_importer.fetch_repositories.return_value = []

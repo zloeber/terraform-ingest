@@ -2,8 +2,7 @@
 
 import pytest
 import yaml
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from terraform_ingest.importers import (
     GitHubImporter,
     merge_repositories,
@@ -58,7 +57,7 @@ class TestGitHubImporter:
             terraform_only=True,
             base_path="/custom/path",
         )
-        
+
         assert importer.org == "test-org"
         assert importer.token == "test-token"
         assert importer.include_private is True
@@ -69,7 +68,7 @@ class TestGitHubImporter:
     def test_init_without_token(self):
         """Test GitHubImporter initialization without token."""
         importer = GitHubImporter(org="test-org")
-        
+
         assert importer.org == "test-org"
         assert importer.token is None
         assert importer.headers == {}
@@ -107,7 +106,7 @@ class TestGitHubImporter:
         mock_get.side_effect = Exception("Network error")
 
         importer = GitHubImporter(org="test-org")
-        
+
         with pytest.raises(Exception):
             importer.fetch_repositories()
 
@@ -121,7 +120,7 @@ class TestGitHubImporter:
 
         importer = GitHubImporter(org="test-org")
         repo = {"full_name": "test-org/terraform-repo"}
-        
+
         assert importer._has_terraform_files(repo) is True
 
     @patch("terraform_ingest.importers.requests.get")
@@ -134,7 +133,7 @@ class TestGitHubImporter:
 
         importer = GitHubImporter(org="test-org")
         repo = {"full_name": "test-org/non-terraform-repo"}
-        
+
         assert importer._has_terraform_files(repo) is False
 
     @patch("terraform_ingest.importers.requests.get")
@@ -146,7 +145,7 @@ class TestGitHubImporter:
 
         importer = GitHubImporter(org="test-org")
         repo = {"full_name": "test-org/some-repo"}
-        
+
         # Should return True by default when rate limited
         assert importer._has_terraform_files(repo) is True
 
@@ -165,7 +164,7 @@ class TestMergeRepositories:
         ]
 
         result = merge_repositories(existing, new, replace=True)
-        
+
         assert len(result) == 1
         assert result[0].name == "repo3"
 
@@ -177,11 +176,13 @@ class TestMergeRepositories:
         ]
         new = [
             RepositoryConfig(url="https://github.com/org/repo3.git", name="repo3"),
-            RepositoryConfig(url="https://github.com/org/repo1.git", name="repo1"),  # Duplicate
+            RepositoryConfig(
+                url="https://github.com/org/repo1.git", name="repo1"
+            ),  # Duplicate
         ]
 
         result = merge_repositories(existing, new, replace=False)
-        
+
         # Should have repo1, repo2, and repo3 (no duplicates)
         assert len(result) == 3
         urls = [repo.url for repo in result]
@@ -197,7 +198,7 @@ class TestMergeRepositories:
         ]
 
         result = merge_repositories(existing, new, replace=False)
-        
+
         assert len(result) == 1
         assert result[0].name == "repo1"
 
@@ -215,10 +216,10 @@ class TestUpdateConfigFile:
         update_config_file(config_path, new_repos, replace=False)
 
         assert config_path.exists()
-        
+
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
-        
+
         assert "repositories" in config
         assert len(config["repositories"]) == 1
         assert config["repositories"][0]["name"] == "repo1"
@@ -228,7 +229,7 @@ class TestUpdateConfigFile:
     def test_update_config_file_existing_merge(self, tmp_path):
         """Test updating an existing config file with merge."""
         config_path = tmp_path / "config.yaml"
-        
+
         # Create initial config
         initial_config = {
             "repositories": [
@@ -246,7 +247,7 @@ class TestUpdateConfigFile:
             "output_dir": "./custom-output",
             "clone_dir": "./custom-repos",
         }
-        
+
         with open(config_path, "w") as f:
             yaml.dump(initial_config, f)
 
@@ -258,7 +259,7 @@ class TestUpdateConfigFile:
 
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
-        
+
         assert len(config["repositories"]) == 2
         assert config["output_dir"] == "./custom-output"
         assert config["clone_dir"] == "./custom-repos"
@@ -266,7 +267,7 @@ class TestUpdateConfigFile:
     def test_update_config_file_existing_replace(self, tmp_path):
         """Test updating an existing config file with replace."""
         config_path = tmp_path / "config.yaml"
-        
+
         # Create initial config
         initial_config = {
             "repositories": [
@@ -283,7 +284,7 @@ class TestUpdateConfigFile:
             ],
             "output_dir": "./output",
         }
-        
+
         with open(config_path, "w") as f:
             yaml.dump(initial_config, f)
 
@@ -295,7 +296,7 @@ class TestUpdateConfigFile:
 
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
-        
+
         # Should have only the new repo
         assert len(config["repositories"]) == 1
         assert config["repositories"][0]["name"] == "repo2"
