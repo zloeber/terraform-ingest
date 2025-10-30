@@ -18,6 +18,8 @@ Further documentation found [here](https://zloeber.github.io/terraform-ingest/)
 
 Or, if you just want the TLDR on using this as an MCP server (along with some examples) check [this](./docs/mcp_use_examples.md) out.
 
+An example project repo with a large list of custom modules for kicking the tires can be found [here]
+
 ## Installation
 
 This application can be run locally using uv or docker.
@@ -59,26 +61,3 @@ MIT License
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-### Automatic Versioning and Release
-
-This project uses **Semantic Versioning** with automatic releases triggered by commits to the `main` branch.
-
-**How it works:**
-1. Commit your changes using [Conventional Commits](https://www.conventionalcommits.org/) format
-2. Merge to `main` branch (via Pull Request)
-3. The semantic release workflow automatically:
-   - Analyzes commits since last tag
-   - Determines version bump (major/minor/patch)
-   - Creates and pushes a git tag
-   - Triggers PyPI publishing
-   - Creates GitHub release with changelog
-
-**Commit format examples:**
-- `feat: add new feature` → Minor version bump
-- `fix: resolve bug` → Patch version bump  
-- `feat!: breaking change` → Major version bump
-
-See [Commit Conventions Guide](./docs/commit_conventions.md) for detailed guidelines and [Semantic Release Documentation](./docs/semantic_release_FEATURE.md) for pipeline details.
-
-````
