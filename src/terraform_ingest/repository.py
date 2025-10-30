@@ -15,16 +15,23 @@ from .logging import get_logger
 class RepositoryManager:
     """Manager for cloning and analyzing git repositories."""
 
-    def __init__(self, clone_dir: str = "./repos", logger: Optional[Any] = None):
+    def __init__(
+        self,
+        clone_dir: str = "./repos",
+        logger: Optional[Any] = None,
+        skip_existing: bool = False,
+    ):
         """Initialize the repository manager.
 
         Args:
             clone_dir: Directory to clone repositories into
             logger: Optional logger instance. Defaults to get_logger() if not provided.
+            skip_existing: If True, skip cloning repositories that already exist locally
         """
         self.clone_dir = Path(clone_dir)
         self.clone_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logger or get_logger(__name__)
+        self.skip_existing = skip_existing
 
     def process_repository(
         self, repo_config: RepositoryConfig
@@ -100,7 +107,14 @@ class RepositoryManager:
         if path.exists():
             try:
                 repo = git.Repo(path)
-                # Fetch latest changes
+                # If skip_existing is True, skip updating
+                if self.skip_existing:
+                    self.logger.info(
+                        f"Repository already exists at {path}, skipping clone/update"
+                    )
+                    return repo
+                # Otherwise fetch latest changes
+                self.logger.info(f"Updating repository from {url}...")
                 repo.remotes.origin.fetch()
                 return repo
             except Exception as e:

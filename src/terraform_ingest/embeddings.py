@@ -163,71 +163,82 @@ class VectorDBManager:
             raise ValueError(f"Unknown embedding strategy: {self.config.strategy}")
 
     def _initialize_chromadb(self):
-        """Initialize ChromaDB client and collection."""
+        """Initialize ChromaDB client and collection.
+
+        Raises:
+            ImportError: If chromadb package is not available
+            RuntimeError: If ChromaDB initialization fails
+        """
         if self.client is not None:
             return
 
         try:
             import chromadb
             from chromadb.config import Settings
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "chromadb package is required for vector embeddings. "
-                "Install with: pip install chromadb"
-            )
+                "Install with: pip install chromadb or use: terraform-ingest install-deps"
+            ) from e
 
-        # Initialize client
-        if self.config.chromadb_host:
-            # Client/server mode
-            self.client = chromadb.HttpClient(
-                host=self.config.chromadb_host, port=self.config.chromadb_port
-            )
-        else:
-            # Persistent local mode
-            Path(self.config.chromadb_path).mkdir(parents=True, exist_ok=True)
-            self.client = chromadb.PersistentClient(
-                path=self.config.chromadb_path,
-                settings=Settings(anonymized_telemetry=False),
-            )
-
-        # Get or create collection
-        if self.config.strategy == "chromadb-default":
-            # Use ChromaDB's default embedding function
-            self.collection = self.client.get_or_create_collection(
-                name=self.config.collection_name,
-                metadata={"description": "Terraform module embeddings"},
-            )
-        else:
-            # Use custom embedding function
-            from chromadb.utils import embedding_functions
-
-            if self.config.strategy == "openai":
-                embedding_function = embedding_functions.OpenAIEmbeddingFunction(
-                    api_key=self.config.openai_api_key,
-                    model_name=self.config.openai_model,
+        try:
+            # Initialize client
+            if self.config.chromadb_host:
+                # Client/server mode
+                self.client = chromadb.HttpClient(
+                    host=self.config.chromadb_host, port=self.config.chromadb_port
                 )
-            elif self.config.strategy == "sentence-transformers":
-                embedding_function = (
-                    embedding_functions.SentenceTransformerEmbeddingFunction(
-                        model_name=self.config.sentence_transformers_model
+            else:
+                # Persistent local mode
+                Path(self.config.chromadb_path).mkdir(parents=True, exist_ok=True)
+                self.client = chromadb.PersistentClient(
+                    path=self.config.chromadb_path,
+                    settings=Settings(anonymized_telemetry=False),
+                )
+
+            # Get or create collection
+            if self.config.strategy == "chromadb-default":
+                # Use ChromaDB's default embedding function
+                self.collection = self.client.get_or_create_collection(
+                    name=self.config.collection_name,
+                    metadata={"description": "Terraform module embeddings"},
+                )
+            else:
+                # Use custom embedding function
+                from chromadb.utils import embedding_functions
+
+                if self.config.strategy == "openai":
+                    embedding_function = embedding_functions.OpenAIEmbeddingFunction(
+                        api_key=self.config.openai_api_key,
+                        model_name=self.config.openai_model,
                     )
-                )
-            else:
-                # For Claude/Voyage, we'll need to create custom embeddings
-                embedding_function = None
+                elif self.config.strategy == "sentence-transformers":
+                    embedding_function = (
+                        embedding_functions.SentenceTransformerEmbeddingFunction(
+                            model_name=self.config.sentence_transformers_model
+                        )
+                    )
+                else:
+                    # For Claude/Voyage, we'll need to create custom embeddings
+                    embedding_function = None
 
-            if embedding_function:
-                self.collection = self.client.get_or_create_collection(
-                    name=self.config.collection_name,
-                    embedding_function=embedding_function,
-                    metadata={"description": "Terraform module embeddings"},
-                )
-            else:
-                # Fallback to default
-                self.collection = self.client.get_or_create_collection(
-                    name=self.config.collection_name,
-                    metadata={"description": "Terraform module embeddings"},
-                )
+                if embedding_function:
+                    self.collection = self.client.get_or_create_collection(
+                        name=self.config.collection_name,
+                        embedding_function=embedding_function,
+                        metadata={"description": "Terraform module embeddings"},
+                    )
+                else:
+                    # Fallback to default
+                    self.collection = self.client.get_or_create_collection(
+                        name=self.config.collection_name,
+                        metadata={"description": "Terraform module embeddings"},
+                    )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to initialize ChromaDB: {e}. "
+                "Check your chromadb configuration and ensure the package is properly installed."
+            ) from e
 
     def _generate_document_id(self, summary: TerraformModuleSummary) -> str:
         """Generate unique ID based on repo:ref:path.

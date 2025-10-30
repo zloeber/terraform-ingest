@@ -24,12 +24,28 @@ class DependencyInstaller:
     def check_package_installed(package_name: str) -> bool:
         """Check if a package is installed.
 
+        Uses importlib.metadata for more reliable detection, which works better
+        with system-wide installations and UV tool environments.
+
         Args:
             package_name: Name of the package to check
 
         Returns:
             True if package is installed, False otherwise
         """
+        try:
+            # First try importlib.metadata (more reliable for system installs)
+            import importlib.metadata
+
+            try:
+                importlib.metadata.version(package_name)
+                return True
+            except importlib.metadata.PackageNotFoundError:
+                pass
+        except (ImportError, Exception):
+            pass
+
+        # Fallback to __import__ for compatibility
         try:
             __import__(package_name.replace("-", "_"))
             return True
