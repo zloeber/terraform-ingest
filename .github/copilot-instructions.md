@@ -1,11 +1,12 @@
 # Instructions for terraform-ingest
 
 ## Project Overview
-A FastAPI/Click-based Python application that ingests multiple Terraform repositories from YAML configuration, analyzes modules across branches/tags, and outputs JSON summaries for AI RAG systems. Also exposes an MCP (Model Context Protocol) service for AI agents.
+A FastMCP/FastAPI/Click-based Python application that ingests multiple Terraform repositories from YAML configuration, analyzes modules across branches/tags, and outputs JSON summaries for AI RAG systems. Also exposes an MCP (Model Context Protocol) service for AI agents.
 
 ## Rules
 - Before running any command, check the current terminal context and use that same terminal ID for all subsequent commands.
-- All documentation created must be created in the ./docs folder.
+- All documentation created must be created in the ./docs folder and should be added to the ./mkdocs.yml file for inclusion in the site.
+- When you need to use the `run_in_terminal` tool always use isBackground=false.
 - Do not run multiple line python commands in a single execution, instead create temporary scripts if needed and run them as single commands.
 - **Always run tests and linting** before committing changes to ensure code quality.
 - Use `uv` package manager instead of `pip` for dependency management.
@@ -21,7 +22,6 @@ A FastAPI/Click-based Python application that ingests multiple Terraform reposit
 - Use `click` for CLI commands and options
 - Use `pydantic` for data models and validation
 - All imports should be at the top of the file, grouped by standard library, third-party, and local imports
-- Never create global variables unless absolutely necessary, prefer passing parameters explicitly
 
 ## Architecture Components
 
@@ -77,7 +77,8 @@ terraform-ingest-mcp
 
 ### MCP Integration
 - FastMCP service reads from `output_dir` (default: `./output`)
-- Exposes `list_repositories` and `search_modules` tools
+- Exposes multiple tools and prompts
+- Exposes dynamic resource urls
 - JSON files must follow `TerraformModuleSummary` schema
 
 ## Testing Patterns
@@ -93,11 +94,11 @@ terraform-ingest-mcp
 uv run black --check src/terraform_ingest
 uv run ruff format --check src/terraform_ingest
 
-# Auto-fix formatting
+# Auto-fix formatting (required before commit)
 uv run black src/terraform_ingest
 uv run ruff format src/terraform_ingest
 
-# Linting with ruff
+# Linting with ruff (required before commit)
 uv run ruff check src/terraform_ingest
 uv run ruff check --fix src/terraform_ingest
 ```
