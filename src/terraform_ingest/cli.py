@@ -14,6 +14,7 @@ from terraform_ingest import __version__, CONFIG_PATH
 from terraform_ingest.mcp_service import start as mcp_main
 from terraform_ingest.mcp_service import _get_module_resource_impl, ModuleQueryService
 from terraform_ingest.indexer import ModuleIndexer
+from terraform_ingest.importers import GitHubImporter, update_config_file
 
 
 @click.group()
@@ -1267,6 +1268,113 @@ def get(doc_id, output_dir, output_json):
         raise click.Abort()
     except Exception as e:
         click.echo(f"Error retrieving module summary: {e}", err=True)
+        raise click.Abort()
+
+
+@cli.group()
+def import_cmd():
+    """Import repositories from external sources into configuration.
+
+    This command group allows importing repositories from various sources
+    (GitHub, GitLab, etc.) and updating your configuration file.
+
+    Example:
+
+        terraform-ingest import github --org hashicorp --config config.yaml
+
+        terraform-ingest import github --org myorg --terraform-only --replace
+    """
+    pass
+
+
+# Rename the group in the CLI to avoid conflict with Python's import keyword
+import_cmd.name = "import"
+
+
+@import_cmd.command()
+@click.option("--org", required=True, help="GitHub organization name")
+@click.option(
+    "--token",
+    envvar="GITHUB_TOKEN",
+    help="GitHub personal access token (or set GITHUB_TOKEN env var)",
+)
+@click.option(
+    "--config",
+    "-c",
+    type=click.Path(),
+    default="config.yaml",
+    help="Configuration file to update (default: config.yaml)",
+)
+@click.option(
+    "--include-private",
+    is_flag=True,
+    help="Include private repositories (requires authentication)",
+)
+@click.option(
+    "--terraform-only",
+    is_flag=True,
+    help="Only include repositories that contain Terraform files",
+)
+@click.option(
+    "--base-path",
+    default="./src",
+    help="Base path for module scanning (default: ./src)",
+)
+@click.option(
+    "--replace",
+    is_flag=True,
+    help="Replace existing repositories instead of merging",
+)
+def github(
+    org: str,
+    token: str,
+    config: str,
+    include_private: bool,
+    terraform_only: bool,
+    base_path: str,
+    replace: bool,
+) -> None:
+    """Import repositories from a GitHub organization.
+
+    This command fetches all repositories from a GitHub organization and
+    adds them to your configuration file. By default, it merges with existing
+    repositories. Use --replace to override the existing list.
+
+    Example:
+
+        terraform-ingest import github --org hashicorp
+
+        terraform-ingest import github --org myorg --token ghp_xxx --terraform-only
+
+        terraform-ingest import github --org myorg --replace --config my-config.yaml
+    """
+    try:
+        config_path = Path(config)
+
+        # Create importer
+        importer = GitHubImporter(
+            org=org,
+            token=token,
+            include_private=include_private,
+            terraform_only=terraform_only,
+            base_path=base_path,
+        )
+
+        # Fetch repositories
+        repos = importer.fetch_repositories()
+
+        if not repos:
+            click.echo("No repositories found matching criteria", err=True)
+            return
+
+        # Update configuration file
+        update_config_file(config_path, repos, replace=replace)
+
+        mode = "Replaced" if replace else "Merged"
+        click.echo(f"{mode} {len(repos)} repositories in {config_path}")
+
+    except Exception as e:
+        click.echo(f"Error importing repositories: {e}", err=True)
         raise click.Abort()
 
 
