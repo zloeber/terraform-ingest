@@ -333,7 +333,7 @@ def init(config_file):
        - Provide the module URL, version, variables, and usage summary
     
     Use this prompt whenever you're tasked with finding, recommending, or selecting a module.
-"""
+""",
         },
         "embedding": {
             "enabled": False,
