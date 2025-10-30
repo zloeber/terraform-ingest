@@ -865,7 +865,7 @@ def test_generate_module_uri(sample_output_dir):
         "https://github.com/terraform-aws-modules/terraform-aws-vpc", "v5.0.0", "."
     )
     assert "terraform-aws-vpc" in uri
-    assert "v5-0-0" in uri  # dots are replaced with hyphens
+    assert "v5.0.0" in uri
     assert uri.startswith("module://")
 
 

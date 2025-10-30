@@ -67,9 +67,9 @@ class RepositoryConfig(BaseModel):
 
     url: str
     name: Optional[str] = None
-    branches: List[str] = Field(default_factory=lambda: ["main"])
+    branches: List[str] = Field(default_factory=list)
     include_tags: bool = True
-    max_tags: Optional[int] = 10
+    max_tags: Optional[int] = 1
     path: str = "."
     recursive: bool = False
     exclude_paths: List[str] = Field(

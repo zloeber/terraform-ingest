@@ -278,9 +278,9 @@ embedding:
 **Repository Options:**
 - `url` (required): Git repository URL
 - `name` (optional): Custom name for the repository
-- `branches` (optional): List of branches to analyze (default: ["main"])
+- `branches` (optional): List of branches to analyze (default: [])
 - `include_tags` (optional): Whether to include git tags (default: true)
-- `max_tags` (optional): Maximum number of tags to process (default: 10)
+- `max_tags` (optional): Maximum number of tags to process (default: 1)
 - `path` (optional): Path within the repository to the Terraform module (default: ".")
 
 **Global Options:**
