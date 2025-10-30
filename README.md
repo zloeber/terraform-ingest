@@ -18,7 +18,7 @@ Further documentation found [here](https://zloeber.github.io/terraform-ingest/)
 
 Or, if you just want the TLDR on using this as an MCP server (along with some examples) check [this](./docs/mcp_use_examples.md) out.
 
-An example project repo with a large list of custom modules for kicking the tires can be found [here]
+An example project repo with a large list of custom modules for kicking the tires can be found [here](https://github.com/zloeber/terraform-ingest-example)
 
 ## Installation
 
