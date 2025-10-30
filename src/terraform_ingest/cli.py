@@ -70,6 +70,11 @@ def cli():
     default=True,
     help="Automatically install missing embedding dependencies",
 )
+@click.option(
+    "--skip-existing/--no-skip-existing",
+    default=False,
+    help="Skip cloning if repository already exists in local cache",
+)
 def ingest(
     config_file,
     output_dir,
@@ -79,6 +84,7 @@ def ingest(
     enable_embeddings,
     embedding_strategy,
     auto_install_deps,
+    skip_existing,
 ):
     """Ingest terraform repositories from a YAML configuration file.
 
@@ -91,12 +97,16 @@ def ingest(
         terraform-ingest ingest config.yaml -o ./my-output -c ./my-repos
 
         terraform-ingest ingest config.yaml --enable-embeddings --embedding-strategy sentence-transformers
+
+        terraform-ingest ingest config.yaml --skip-existing
     """
     click.echo(f"Loading configuration from {config_file}")
 
     try:
         ingester = TerraformIngest.from_yaml(
-            config_file, auto_install_deps=auto_install_deps
+            config_file,
+            auto_install_deps=auto_install_deps,
+            skip_existing=skip_existing,
         )
 
         # Override config if command-line options are provided
@@ -468,6 +478,8 @@ def install_deps(config_file, strategy, no_auto_install):
         if success:
             click.echo("✓ Successfully installed all packages")
             # Verify installation
+            # Uses importlib.metadata for robust detection across different
+            # installation methods including UV tool environments.
             still_missing = DependencyInstaller.get_missing_packages(
                 packages_to_install
             )
@@ -476,8 +488,12 @@ def install_deps(config_file, strategy, no_auto_install):
                 for pkg in packages_to_install:
                     click.echo(f"  • {pkg}")
             else:
+                # If packages were installed but not found, log for troubleshooting
                 click.echo(
-                    f"⚠ Warning: Some packages still not found: {', '.join(still_missing)}"
+                    f"⚠ Warning: Some packages not immediately detected: {', '.join(still_missing)}"
+                )
+                click.echo(
+                    "ℹ This may be a detection issue. Try rerunning the command or restarting your shell."
                 )
         else:
             click.echo("✗ Installation failed", err=True)
