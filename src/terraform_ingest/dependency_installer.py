@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import site
 from typing import List
 from loguru import logger as default_logger
 
@@ -51,6 +52,29 @@ class DependencyInstaller:
             return True
         except ImportError:
             return False
+
+    @staticmethod
+    def _refresh_sys_path():
+        """Refresh sys.path to include newly installed packages.
+
+        This is necessary after subprocess package installations to ensure
+        that newly installed packages are discoverable by the current Python process.
+        """
+        try:
+            # Re-scan site-packages directories
+            site.main()
+
+            # Also try to add site packages manually
+            import sysconfig
+
+            stdlib_packages = sysconfig.get_paths()
+            for key in ["purelib", "platlib"]:
+                if key in stdlib_packages:
+                    path = stdlib_packages[key]
+                    if path not in sys.path:
+                        sys.path.insert(0, path)
+        except Exception as e:
+            default_logger.debug(f"Could not refresh sys.path: {e}")
 
     @staticmethod
     def get_missing_packages(packages: List[str]) -> List[str]:
@@ -117,6 +141,7 @@ class DependencyInstaller:
                         timeout=300,
                     )
                     logger.info("Successfully installed packages using uv")
+                    DependencyInstaller._refresh_sys_path()
                     return True
                 except subprocess.CalledProcessError as e:
                     logger.debug(f"uv approach failed: {e.stderr}")
@@ -148,6 +173,7 @@ class DependencyInstaller:
                     timeout=300,
                 )
                 logger.info("Successfully installed packages using pip")
+                DependencyInstaller._refresh_sys_path()
                 return True
             except subprocess.CalledProcessError as e:
                 logger.debug(f"Failed: {e.stderr}")
