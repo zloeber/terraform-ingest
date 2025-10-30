@@ -1,23 +1,23 @@
-repositories:
-  # Example: AWS VPC Terraform module
-  - url: https://github.com/terraform-aws-modules/terraform-aws-vpc
-    name: terraform-aws-vpc
-    branches:
-      - master
-    include_tags: true
-    max_tags: 2
-    path: .
-    recursive: false
-    exclude_paths: []
+repositories: []
+  # # Example: AWS VPC Terraform module
+  # - url: https://github.com/terraform-aws-modules/terraform-aws-vpc
+  #   name: terraform-aws-vpc
+  #   branches:
+  #     - master
+  #   include_tags: true
+  #   max_tags: 2
+  #   path: .
+  #   recursive: false
+  #   exclude_paths: []
 
-  # Example: AWS EC2 Terraform module
-  - url: https://github.com/terraform-aws-modules/terraform-aws-ec2-instance
-    name: terraform-aws-ec2
-    branches: []
-    include_tags: true
-    max_tags: 1
-    path: .
-    exclude_paths: []
+  # # Example: AWS EC2 Terraform module
+  # - url: https://github.com/terraform-aws-modules/terraform-aws-ec2-instance
+  #   name: terraform-aws-ec2
+  #   branches: []
+  #   include_tags: true
+  #   max_tags: 1
+  #   path: .
+  #   exclude_paths: []
 
 # Output directory for JSON summaries
 output_dir: ./output
@@ -31,18 +31,25 @@ mcp:
   auto_ingest: true               # Enable automatic ingestion
   refresh_interval_hours: 6       # Auto-refresh every 6 hours (null to disable)
   instructions: |
-    You are a Terraform module assistant that helps users find and use infrastructure modules.
-
-    CRITICAL RULES:
-    1. ALWAYS prefer tagged release versions (e.g., v1.2.3, 1.2.3) over branch references
-    2. When multiple versions exist, recommend the latest stable release
-    3. Warn users if they're using a branch reference instead of a tag
-    4. If a module has no tagged releases, clearly state this limitation
-
-    Search Strategy:
-    - Search for modules matching the user's requirements
-    - Filter results to prioritize tagged releases
-    - If only branch versions exist, explicitly mention this as a risk
+    You have access to a comprehensive Terraform module library via the terraform-ingest MCP service.
+    
+    When a user asks you to find or recommend the best Terraform module for a specific use case:
+    1. First, understand their requirements by asking clarifying questions about:
+       - The cloud provider (aws, azure, gcp, etc.)
+       - The resource type or infrastructure component needed (networking, compute, security, etc.)
+       - Any specific features or constraints
+    
+    2. Then use the "Find Terraform Module" prompt with:
+       - keywords: A concise description of what they need (e.g., "VPC with security groups and NAT gateway")
+       - provider: The cloud provider (e.g., "aws")
+    
+    3. This prompt will guide you to:
+       - Search for relevant modules using search_modules_vector
+       - Retrieve detailed information about each candidate
+       - Compare and recommend the best fit
+       - Provide the module URL, version, variables, and usage summary
+    
+    Use this prompt whenever you're tasked with finding, recommending, or selecting a module.
   
   # Custom prompt overrides (optional)
   # Uncomment to override default prompts with your organization-specific guidance
