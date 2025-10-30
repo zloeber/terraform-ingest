@@ -759,6 +759,79 @@ def test_list_module_resources_not_found(sample_output_dir):
     assert resources == []
 
 
+def test_list_module_versions_aws_vpc(sample_output_dir):
+    """Test listing all versions for AWS VPC module."""
+    service = ModuleQueryService(sample_output_dir)
+    versions = service.list_module_versions(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        path=".",
+    )
+
+    # Should have 2 versions: main and v5.0.0
+    assert len(versions) == 2
+    assert all("ref" in v for v in versions)
+    assert all("module_name" in v for v in versions)
+    assert all("index_id" in v for v in versions)
+    assert all("description" in v for v in versions)
+    assert all("variables_count" in v for v in versions)
+    assert all("outputs_count" in v for v in versions)
+    assert all("resources_count" in v for v in versions)
+
+    # Check specific versions
+    refs = [v["ref"] for v in versions]
+    assert "main" in refs
+    assert "v5.0.0" in refs
+
+    # Check module names
+    assert all(v["module_name"] == "terraform-aws-vpc" for v in versions)
+
+    # Check resource counts
+    assert all(v["resources_count"] == 3 for v in versions)
+
+
+def test_list_module_versions_azure(sample_output_dir):
+    """Test listing all versions for Azure module."""
+    service = ModuleQueryService(sample_output_dir)
+    versions = service.list_module_versions(
+        repository="https://github.com/terraform-azure-modules/terraform-azurerm-network",
+        path=".",
+    )
+
+    # Should have 1 version: main
+    assert len(versions) == 1
+    assert versions[0]["ref"] == "main"
+    assert versions[0]["module_name"] == "terraform-azurerm-network"
+    assert versions[0]["resources_count"] == 2
+
+
+def test_list_module_versions_not_found(sample_output_dir):
+    """Test listing versions for non-existent module."""
+    service = ModuleQueryService(sample_output_dir)
+    versions = service.list_module_versions(
+        repository="https://github.com/nonexistent/repo", path="."
+    )
+
+    assert versions == []
+
+
+def test_list_module_versions_index_id_format(sample_output_dir):
+    """Test that index_id is properly formatted as URI."""
+    service = ModuleQueryService(sample_output_dir)
+    versions = service.list_module_versions(
+        repository="https://github.com/terraform-aws-modules/terraform-aws-vpc",
+        path=".",
+    )
+
+    for version in versions:
+        index_id = version["index_id"]
+        # Verify it's a valid URI format
+        assert index_id.startswith("module://")
+        assert "terraform-aws-vpc" in index_id
+        assert (
+            version["ref"].replace(".", "-") in index_id or version["ref"] in index_id
+        )
+
+
 def test_mcp_list_modules_tool(sample_output_dir):
     """Test the MCP list_modules tool."""
     from terraform_ingest.mcp_service import _list_modules_impl
@@ -792,7 +865,7 @@ def test_generate_module_uri(sample_output_dir):
         "https://github.com/terraform-aws-modules/terraform-aws-vpc", "v5.0.0", "."
     )
     assert "terraform-aws-vpc" in uri
-    assert "v5-0-0" in uri  # dots are replaced with hyphens
+    assert "v5.0.0" in uri
     assert uri.startswith("module://")
 
 

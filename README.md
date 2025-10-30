@@ -1,22 +1,22 @@
-# terraform-ingest
+# Terraform Ingest
 
-A terraform multi-repo module AI RAG ingestion engine that accepts a YAML file of terraform git repository sources, downloads them locally using existing credentials, creates JSON summaries of their purpose, inputs, outputs, and providers for branches or tagged releases you specify for ingestion via a RAG pipeline into a vector database. Includes an easy to use cli, API, or MCP server.
+A Terraform RAG ingestion engine that accepts a YAML file of terraform git repository sources, downloads them locally using existing credentials, creates JSON summaries of their purpose, inputs, outputs, and providers for branches or tagged releases you specify and embeds them into a vector database for similarity searches. Includes an easy to use cli, API, or MCP server.
 
 ## Features
 
 - 📥 **Multi-Repository Ingestion**: Process multiple Terraform repositories from a single YAML configuration
 - 🔄 **Auto-Import**: Import repositories from GitHub organizations (GitLab, Bitbucket support coming soon)
 - 🔍 **Comprehensive Analysis**: Extracts variables, outputs, providers, modules, and descriptions
-- 🏷️ **Branch & Tag Support**: Analyzes both branches and git tags
+- 🏷️ **Branch & Tag Support**: Analyzes both branches and git tags of your choosing
 - 🔌 **Dual Interface**: Use as a CLI tool (Click) or as a REST API service (FastAPI)
-- 🤖 **MCP Integration**: FastMCP service for AI agent access to ingested modules
+- 🤖 **MCP Integration**: MCP service for AI agent access to ingested modules via STDIO, SSE, or Streamable-http
 - 📊 **JSON Output**: Generates structured JSON summaries ready for RAG ingestion
 - 🔐 **Credential Support**: Uses existing git credentials for private repositories
 - 🧠 **Vector Database Embeddings**: Semantic search with ChromaDB, OpenAI, Claude, or sentence-transformers
 
 Further documentation found [here](https://zloeber.github.io/terraform-ingest/)
 
-Or, if you just want the goods on using this as an MCP server along with some examples check [this](./docs/mcp_use_examples.md) out.
+Or, if you just want the TLDR on using this as an MCP server (along with some examples) check [this](./docs/mcp_use_examples.md) out.
 
 ## Installation
 

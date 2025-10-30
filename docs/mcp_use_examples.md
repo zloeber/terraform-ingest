@@ -10,7 +10,9 @@ They have produced almost 200 professional quality AWS terraform modules and mor
 
 ### The Setup
 
-I used a custom script that uses my GitHub token to list out all the repositories for a target organization in a format I can then use in the configuration file for terraform-ingest (`./scripts/get-github-repos.py`). Using this output I created a custom yaml configuration for terraform-ingest in (`./examples/cloudposse.yaml`). Because Cloudposse is really good with standardized modules and tagged releases I'm purposefully targeting the latest tagged releases only and the `./src` path for each module repository for ingestion. 
+~~I used a custom script that uses my GitHub token to list out all the repositories for a target organization in a format I can then use in the configuration file for terraform-ingest (`./scripts/get-github-repos.py`). Using this output I created a custom yaml configuration for terraform-ingest in (`./examples/cloudposse.yaml`).~~ We can import a target github organization directly using `terraform-ingest import github --myorg cloudposse-terraform-components --token <GITHUB_TOKEN> --terraform-only --base-path './src' --max-tags 1`. 
+
+Because Cloudposse is really good with standardized modules and tagged releases I'm purposefully targeting the latest tagged releases only and the `./src` path for each module repository for ingestion. 
 
 ```yaml
 ...

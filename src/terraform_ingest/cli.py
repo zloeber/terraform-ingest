@@ -1317,13 +1317,25 @@ import_cmd.name = "import"
 )
 @click.option(
     "--base-path",
-    default="./src",
-    help="Base path for module scanning (default: ./src)",
+    default=".",
+    help="Base path for module scanning (default: .)",
 )
 @click.option(
     "--replace",
     is_flag=True,
     help="Replace existing repositories instead of merging",
+)
+@click.option(
+    "--max-tags",
+    type=int,
+    default=1,
+    help="Maximum number of tags to include per repository (default: 1)",
+)
+@click.option(
+    "--branches",
+    type=str,
+    default="",
+    help="Comma-separated list of branches to include (default: empty)",
 )
 def github(
     org: str,
@@ -1333,6 +1345,8 @@ def github(
     terraform_only: bool,
     base_path: str,
     replace: bool,
+    max_tags: int,
+    branches: str,
 ) -> None:
     """Import repositories from a GitHub organization.
 
@@ -1347,9 +1361,14 @@ def github(
         terraform-ingest import github --org myorg --token ghp_xxx --terraform-only
 
         terraform-ingest import github --org myorg --replace --config my-config.yaml
+
+        terraform-ingest import github --org myorg --max-tags 5 --branches main,develop
     """
     try:
         config_path = Path(config)
+
+        # Parse branches from comma-separated string
+        branches_list = [b.strip() for b in branches.split(",") if b.strip()]
 
         # Create importer
         importer = GitHubImporter(
@@ -1366,6 +1385,11 @@ def github(
         if not repos:
             click.echo("No repositories found matching criteria", err=True)
             return
+
+        # Apply max_tags and branches to all repositories
+        for repo in repos:
+            repo.max_tags = max_tags
+            repo.branches = branches_list
 
         # Update configuration file
         update_config_file(config_path, repos, replace=replace)

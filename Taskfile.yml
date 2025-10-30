@@ -214,7 +214,7 @@ tasks:
         vars:
           DOCKER_BUILD_ARGS: "--build-arg DEPLOY_VERSION={{.VERSION}}-$(git rev-parse --short HEAD)"
 
-  start:mcp:inspector:
+  mcp:inspector:
     desc: Start MCP Inspector
     cmds:
       - npx -y @modelcontextprotocol/inspector
