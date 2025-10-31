@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-  "name": "io.github.zloeber/terraform-ingest-mcp",
+  "name": "io.github.zloeber/terraform-ingest",
   "title": "Terraform Ingest MCP",
   "description": "Ingest and analyze Terraform modules from multiple repositories for AI RAG systems",
   "version": "0.0.1",
