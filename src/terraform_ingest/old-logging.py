@@ -16,6 +16,131 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.theme import Theme
 
+# Disable loguru's default handler to prevent unwanted stderr output
+logger.remove()
+
+# Global handler ID to ensure all loggers share the same handler
+_global_handler_id: Optional[int] = None
+_handler_initialized: bool = False
+
+
+class NullStream:
+    """A stream that discards all writes.
+
+    Used when running in stdio mode and /dev/tty is not available.
+    """
+
+    def write(self, message: str) -> None:
+        pass
+
+    def flush(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+
+def get_console_stream():
+    # Prefer a real terminal device if possible
+    try:
+        if os.name == "nt":
+            return open("CON", "w")  # Windows console device
+        else:
+            return open("/dev/tty", "w")  # Unix-like systems
+    except Exception:
+        # Fallback to NullStream if no console is available (prevents stderr pollution in stdio mode)
+        return NullStream()
+
+
+def get_stdio_safe_stream():
+    """Get a stream that won't interfere with stdio protocol.
+
+    In stdio mode, returns NullStream to suppress all output.
+    Otherwise, tries to use /dev/tty first (so output still appears on terminal).
+    Falls back to a null stream if /dev/tty is not available.
+
+    Returns:
+        File object that writes to /dev/tty, NullStream, or discards output
+    """
+    # In stdio mode, suppress all logging
+    if _is_stdio_mode():
+        return NullStream()
+
+    try:
+        if os.name == "nt":
+            return open("CON", "w")  # Windows console device
+        else:
+            # Try to open /dev/tty
+            return open("/dev/tty", "w")
+    except Exception:
+        # Fallback to null stream (no stderr output in stdio mode)
+        return NullStream()
+
+
+def _initialize_global_handler(
+    console_file_object: Optional[Any] = None,
+    log_level: str = "INFO",
+    log_to_file: bool = False,
+    log_file_path: str = "./logs/terraform-ingest.log",
+    rotation: str = "500 MB",
+    retention: str = "10 days",
+    backtrace: bool = True,
+    diagnose: bool = True,
+    json_logs: bool = False,
+    minimal_console: bool = False,
+) -> None:
+    """Initialize the global handler once to avoid duplicate handlers."""
+    global _global_handler_id, _handler_initialized
+
+    if _handler_initialized:
+        return
+
+    _handler_initialized = True
+
+    # Choose formatting
+    if json_logs or minimal_console:
+        log_format = "{message}"
+        serialize = json_logs
+    else:
+        log_format = (
+            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+            "<level>{level: <8}</level> | "
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+            "<dim>{file}:{module}</dim> - "
+            "<level>{message}</level>"
+        )
+        serialize = False
+
+    # Console sink
+    console_sink = (
+        console_file_object
+        if console_file_object is not None
+        else get_stdio_safe_stream()
+    )
+    _global_handler_id = logger.add(
+        console_sink,
+        level=log_level,
+        format=log_format,
+        backtrace=backtrace,
+        diagnose=diagnose,
+        serialize=serialize,
+        enqueue=True,
+    )
+
+    # Optional file sink
+    if log_to_file:
+        logger.add(
+            log_file_path,
+            level=log_level,
+            format=log_format,
+            rotation=rotation,
+            retention=retention,
+            backtrace=backtrace,
+            diagnose=diagnose,
+            serialize=serialize,
+            enqueue=True,
+        )
+
 
 class LoggerProtocol(Protocol):
     """
@@ -152,9 +277,6 @@ class UnifiedLogger(LoggerProtocol):
     def __init__(self, config: LoggerConfig):
         self.config = config
         self.debug_mode = config.log_level in ("DEBUG", "TRACE")
-        self._stdout_handler_id = None
-        self._file_handler_id = None
-        self._console_file = None  # Store reference for flushing
 
         # Initialize rich console if enabled
         self.console = None
@@ -187,47 +309,26 @@ class UnifiedLogger(LoggerProtocol):
                 # Fallback to stdout if console stream fails
                 self.console = Console(theme=theme)
 
-        # Remove default loguru handler
-        logger.remove()
-
-        # Choose formatting
-        if config.json_logs or config.minimal_console:
-            log_format = "{message}"
-            serialize = config.json_logs
-        else:
-            log_format = (
-                "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-                "<level>{level: <8}</level> | "
-                "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-                "<dim>{file}:{module}</dim> - "
-                "<level>{message}</level>"
-            )
-            serialize = False
-
-        # Console sink
-        self._stdout_handler_id = logger.add(
-            sys.stdout,
-            level=config.log_level,
-            format=log_format,
-            backtrace=config.backtrace,
-            diagnose=config.diagnose,
-            serialize=serialize,
-            enqueue=True,
+        # Console sink - use configured stream (e.g., /dev/tty or NullStream)
+        console_sink = (
+            config.console_file_object
+            if config.console_file_object is not None
+            else sys.stdout
         )
 
-        # Optional file sink
-        if config.log_to_file:
-            self._file_handler_id = logger.add(
-                config.log_file_path,
-                level=config.log_level,
-                format=log_format,
-                rotation=config.rotation,
-                retention=config.retention,
-                backtrace=config.backtrace,
-                diagnose=config.diagnose,
-                serialize=serialize,
-                enqueue=True,
-            )
+        # Initialize global handler (only happens on first call)
+        _initialize_global_handler(
+            console_file_object=console_sink,
+            log_level=config.log_level,
+            log_to_file=config.log_to_file,
+            log_file_path=config.log_file_path,
+            rotation=config.rotation,
+            retention=config.retention,
+            backtrace=config.backtrace,
+            diagnose=config.diagnose,
+            json_logs=config.json_logs,
+            minimal_console=config.minimal_console,
+        )
 
         self._intercept_std_logging()
 
@@ -242,54 +343,8 @@ class UnifiedLogger(LoggerProtocol):
         try:
             self.config.log_level = level
             self.debug_mode = level == "DEBUG" or level == "TRACE"
-
-            # Update stdout handler
-            if self._stdout_handler_id is not None:
-                logger.remove(self._stdout_handler_id)
-                self._stdout_handler_id = logger.add(
-                    sys.stdout,
-                    level=level,
-                    format=(
-                        "{message}"
-                        if self.config.json_logs or self.config.minimal_console
-                        else (
-                            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-                            "<level>{level: <8}</level> | "
-                            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-                            "<dim>{file}:{module}</dim> - "
-                            "<level>{message}</level>"
-                        )
-                    ),
-                    backtrace=self.config.backtrace,
-                    diagnose=self.config.diagnose,
-                    serialize=self.config.json_logs,
-                    enqueue=True,
-                )
-
-            # Update file handler if it exists
-            if self._file_handler_id is not None and self.config.log_to_file:
-                logger.remove(self._file_handler_id)
-                self._file_handler_id = logger.add(
-                    self.config.log_file_path,
-                    level=level,
-                    format=(
-                        "{message}"
-                        if self.config.json_logs or self.config.minimal_console
-                        else (
-                            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-                            "<level>{level: <8}</level> | "
-                            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-                            "<dim>{file}:{module}</dim> - "
-                            "<level>{message}</level>"
-                        )
-                    ),
-                    rotation=self.config.rotation,
-                    retention=self.config.retention,
-                    backtrace=self.config.backtrace,
-                    diagnose=self.config.diagnose,
-                    serialize=self.config.json_logs,
-                    enqueue=True,
-                )
+            # Note: Global handler level is already managed by _initialize_global_handler
+            # Changing log level here would affect all loggers, so we just update the config
             return None
         except Exception as e:
             return e
@@ -652,43 +707,167 @@ class UnifiedLogger(LoggerProtocol):
             return e
 
 
+# Logger instance caches to prevent duplicate handlers
+_silent_logger_cache: Optional[Any] = None
+_mcp_logger_cache: Optional[Any] = None
+_default_loggers_cache: dict[str, Any] = {}
+
+
+def _is_stdio_mode() -> bool:
+    """Check if running in stdio mode.
+
+    When the MCP server runs in stdio mode, we should suppress logs
+    to avoid corrupting the JSON protocol.
+
+    Returns:
+        True if running in stdio mode, False otherwise
+    """
+    try:
+        from terraform_ingest.mcp_service import MCPContext
+
+        return MCPContext.get_instance().stdio_mode
+    except Exception:
+        # If we can't access MCPContext, assume we're not in stdio mode
+        return False
+
+
+def get_null_logger(name: str = "null") -> Any:
+    """Get a logger that discards all output (for stdio mode).
+
+    Returns:
+        UnifiedLogger instance that outputs to NullStream
+    """
+    config = LoggerConfig(name=name, console_file_object=NullStream())
+    return UnifiedLogger(config)
+
+
+class StdioAwareLoggerProxy:
+    """Proxy logger that checks stdio mode on each call.
+
+    When in stdio mode, all logging is suppressed to protect the JSON protocol.
+    Otherwise, logs are passed to the actual logger.
+
+    This proxy is created at module-import time, but defers checking stdio_mode
+    until each logging call, allowing the MCPContext to be initialized after
+    module import.
+    """
+
+    def __init__(self, actual_logger: Any, null_logger: Any):
+        self._actual_logger = actual_logger
+        self._null_logger = null_logger
+
+    def _get_active_logger(self) -> Any:
+        """Get the appropriate logger based on current stdio mode."""
+        if _is_stdio_mode():
+            return self._null_logger
+        return self._actual_logger
+
+    def debug(self, message: str) -> Any:
+        return self._get_active_logger().debug(message)
+
+    def info(self, message: str) -> Any:
+        return self._get_active_logger().info(message)
+
+    def warning(self, message: str) -> Any:
+        return self._get_active_logger().warning(message)
+
+    def error(self, message: str) -> Any:
+        return self._get_active_logger().error(message)
+
+    def critical(self, message: str) -> Any:
+        return self._get_active_logger().critical(message)
+
+    def exception(self, message: str) -> Any:
+        return self._get_active_logger().exception(message)
+
+    def flush_logs(self) -> Any:
+        return self._get_active_logger().flush_logs()
+
+    # Forward other attributes to the actual logger
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._get_active_logger(), name)
+
+
+def get_silent_logger() -> Any:
+    """Get a logger that won't interfere with stdio protocol in MCP mode.
+
+    This logger outputs to /dev/tty if available (so terminal users see logs),
+    or to a null stream if /dev/tty is not available (e.g., in containers).
+    This ensures logs never interfere with the JSON protocol on stdio.
+
+    Returns:
+        UnifiedLogger instance configured to output safely in stdio mode
+    """
+    global _silent_logger_cache
+    if _silent_logger_cache is not None:
+        return _silent_logger_cache
+
+    console_file_object = get_stdio_safe_stream()
+    config = LoggerConfig(name="silent", console_file_object=console_file_object)
+    _silent_logger_cache = UnifiedLogger(config)
+    return _silent_logger_cache
+
+
 def get_logger(name: str = __name__) -> Any:
     """
-    Get a logger instance with default configuration.
+    Get a logger instance with dynamic stdio mode awareness.
+
+    When in stdio mode, this logger will suppress all output to prevent
+    corrupting the JSON protocol. The mode is checked on each call, allowing
+    MCPContext to be initialized after module import.
 
     Args:
         name: Logger name
 
     Returns:
-        UnifiedLogger instance
+        StdioAwareLoggerProxy that wraps the actual logger
     """
-    config = LoggerConfig(name=name)
-    return UnifiedLogger(config)
+    global _default_loggers_cache
+    if name not in _default_loggers_cache:
+        config = LoggerConfig(name=name)
+        actual_logger = UnifiedLogger(config)
+        null_logger = get_null_logger(name)
+        proxy_logger = StdioAwareLoggerProxy(actual_logger, null_logger)
+        _default_loggers_cache[name] = proxy_logger
+
+    return _default_loggers_cache[name]
 
 
 def get_mcp_logger(name: str = "mcp") -> Any:
     """
-    Get a logger instance configured for MCP service with console output directed to the MCP console stream.
+    Get a logger instance configured for MCP service with dynamic stdio mode awareness.
+
+    When in stdio mode, this logger will suppress all output to prevent
+    corrupting the JSON protocol. Otherwise, outputs are directed to
+    /dev/tty or a safe fallback stream.
 
     This logger is optimized for MCP services and includes:
     - Console output directed to the appropriate terminal device (/dev/tty on Unix, CON on Windows)
     - Immediate log flushing via flush_logs() method to avoid buffering issues
-    - Fallback to stderr if no console device is available
+    - In stdio mode, all output is discarded (checked dynamically on each call)
 
     Args:
         name: Logger name (defaults to "mcp")
 
     Returns:
-        UnifiedLogger instance configured with MCP console stream, with flush_logs() method available
+        StdioAwareLoggerProxy that wraps the actual logger
 
     Example:
         >>> mcp_logger = get_mcp_logger()
         >>> mcp_logger.info("MCP service started")
         >>> mcp_logger.flush_logs()  # Ensure logs are written immediately
     """
+    global _mcp_logger_cache
+    if _mcp_logger_cache is not None:
+        return _mcp_logger_cache
+
     console_file_object = get_console_stream()
     config = LoggerConfig(name=name, console_file_object=console_file_object)
-    return UnifiedLogger(config)
+    actual_logger = UnifiedLogger(config)
+    null_logger = get_null_logger(name)
+    proxy_logger = StdioAwareLoggerProxy(actual_logger, null_logger)
+    _mcp_logger_cache = proxy_logger
+    return _mcp_logger_cache
 
 
 class LoggingModel(BaseModel):
@@ -704,15 +883,3 @@ class LoggingModel(BaseModel):
 
     def set_logger(self, logger):
         self._logger = logger
-
-
-def get_console_stream():
-    # Prefer a real terminal device if possible
-    try:
-        if os.name == "nt":
-            return open("CON", "w")  # Windows console device
-        else:
-            return open("/dev/tty", "w")  # Unix-like systems
-    except Exception:
-        # Fallback to stderr if no console is available
-        return sys.stderr

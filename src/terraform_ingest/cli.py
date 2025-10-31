@@ -15,6 +15,14 @@ from terraform_ingest.mcp_service import start as mcp_main
 from terraform_ingest.mcp_service import _get_module_resource_impl, ModuleQueryService
 from terraform_ingest.indexer import ModuleIndexer
 from terraform_ingest.importers import GitHubImporter, update_config_file
+from terraform_ingest.dependency_installer import DependencyInstaller
+
+# from terraform_ingest.logging import get_logger
+
+# logger = get_logger(__name__)
+from terraform_ingest.tty_logger import setup_tty_logger
+
+logger = setup_tty_logger()
 
 
 @click.group()
@@ -412,8 +420,6 @@ def install_deps(config_file, strategy, no_auto_install):
         # Report only (no install)
         terraform-ingest install-deps config.yaml --no-auto-install
     """
-    from terraform_ingest.dependency_installer import DependencyInstaller
-    from loguru import logger
 
     try:
         packages_to_install = []
@@ -880,13 +886,6 @@ def mcp(config, transport, host, port, ingest_on_startup):
     else:
         config = os.getenv("TERRAFORM_INGEST_CONFIG", "config.yaml")
         os.environ["TERRAFORM_INGEST_CONFIG"] = config
-
-    # if transport != "stdio" and transport is not None:
-    #     click.echo(f"Transport: {transport}")
-    #     click.echo(f"Address: {host or '127.0.0.1'}:{port or 3000}")
-    #     if ingest_on_startup is not None:
-    #         click.echo(f"Ingest on startup: {ingest_on_startup}")
-    #     click.echo("Press CTRL+C to quit")
 
     try:
         mcp_main(

@@ -10,8 +10,9 @@ from fastmcp import FastMCP
 
 from terraform_ingest.models import IngestConfig
 from terraform_ingest.ingest import TerraformIngest
+from terraform_ingest.tty_logger import setup_tty_logger
 
-from terraform_ingest.logging import get_mcp_logger
+logger = setup_tty_logger()
 
 # Initialize FastMCP server with default instructions
 # These will be updated when the config is loaded
@@ -19,12 +20,6 @@ mcp = FastMCP(
     name="terraform-ingest",
     instructions="Service for querying ingested Terraform modules from Git repositories.",
 )
-
-# Create MCP logger with flushing capability
-mcp_logger = get_mcp_logger("terraform-ingest")
-
-# Flush logs immediately to avoid buffering issues
-mcp_logger.flush_logs()
 
 
 class MCPContext:
@@ -111,7 +106,7 @@ class ModuleQueryService:
                     summary = json.load(f)
                     summaries.append(summary)
             except Exception as e:
-                mcp_logger.error(f"Error loading {json_file}: {e}")
+                logger.error(f"Error loading {json_file}: {e}")
 
         return summaries
 
@@ -561,17 +556,15 @@ def set_mcp_context(
     # Initialize custom prompts from configuration if available
     if config and config.mcp and config.mcp.prompts:
         set_custom_prompts(config.mcp.prompts)
-        mcp_logger.info(
+        logger.info(
             f"Loaded {len(config.mcp.prompts)} custom prompt overrides from configuration"
         )
 
     # Log vector database status
     if vector_db_enabled:
-        mcp_logger.info(
-            "Vector database enabled - search_modules_vector tool available"
-        )
+        logger.info("Vector database enabled - search_modules_vector tool available")
     else:
-        mcp_logger.info(
+        logger.info(
             "Vector database disabled - search_modules_vector will return error"
         )
 
@@ -1484,16 +1477,14 @@ def _load_config_file(config_file: str = "config.yaml") -> Optional[IngestConfig
     """Load configuration file if it exists."""
     config_path = Path(config_file)
     if not config_path.exists():
-        mcp_logger.warning(
-            f"Config file {config_file} not found, skipping auto-ingestion"
-        )
+        logger.warning(f"Config file {config_file} not found, skipping auto-ingestion")
         return None
 
     try:
         ingester = TerraformIngest.from_yaml(str(config_path))
         return ingester.config
     except Exception as e:
-        mcp_logger.error(f"Error loading config file {config_file}: {e}")
+        logger.error(f"Error loading config file {config_file}: {e}")
         return None
 
 
@@ -1514,12 +1505,12 @@ def _update_mcp_instructions(config: Optional[IngestConfig]):
 def _run_ingestion(config_file: str = "config.yaml"):
     """Run ingestion process from configuration file."""
     try:
-        mcp_logger.info(f"Starting auto-ingestion from {config_file}...")
-        ingester = TerraformIngest.from_yaml(config_file, logger=mcp_logger)
+        logger.info(f"Starting auto-ingestion from {config_file}...")
+        ingester = TerraformIngest.from_yaml(config_file, logger=logger)
         summaries = ingester.ingest()
-        mcp_logger.info(f"Auto-ingestion completed: {len(summaries)} modules processed")
+        logger.info(f"Auto-ingestion completed: {len(summaries)} modules processed")
     except Exception as e:
-        mcp_logger.error(f"Error during auto-ingestion: {e}")
+        logger.error(f"Error during auto-ingestion: {e}")
 
 
 def _start_periodic_ingestion(config: IngestConfig, config_file: str):
@@ -1531,14 +1522,14 @@ def _start_periodic_ingestion(config: IngestConfig, config_file: str):
         interval_seconds = config.mcp.refresh_interval_hours * 3600
         while True:
             time.sleep(interval_seconds)
-            mcp_logger.info(
+            logger.info(
                 f"Running scheduled ingestion (every {config.mcp.refresh_interval_hours}h)"
             )
             _run_ingestion(config_file)
 
     thread = threading.Thread(target=periodic_runner, daemon=True)
     thread.start()
-    mcp_logger.info(
+    logger.info(
         f"Started periodic ingestion thread (every {config.mcp.refresh_interval_hours}h)"
     )
 
@@ -1576,7 +1567,7 @@ def start(
     stdio_mode = transport_mode == "stdio"
 
     # Initialize the TerraformIngest instance and set MCP context
-    ingester = TerraformIngest.from_yaml(config_file, logger=mcp_logger)
+    ingester = TerraformIngest.from_yaml(config_file, logger=logger)
     vector_db_enabled = (config and config.embedding and config.embedding.enabled) or (
         ingester.vector_db is not None
     )
@@ -1584,10 +1575,10 @@ def start(
 
     bind_host = host if host else (mcp_config.host if mcp_config else "127.0.0.1")
     bind_port = port if port else (mcp_config.port if mcp_config else 3000)
-    mcp_logger.info(f"Transport: {transport_mode}")
+    logger.info(f"Transport: {transport_mode}")
 
     if transport_mode != "stdio":
-        mcp_logger.info(f"Listening on {bind_host}:{bind_port}")
+        logger.info(f"Listening on {bind_host}:{bind_port}")
 
     # Determine ingest_on_startup setting (CLI args override config)
     should_ingest_on_startup = (
@@ -1598,7 +1589,7 @@ def start(
 
     # Run ingestion on startup if enabled
     if should_ingest_on_startup:
-        mcp_logger.info("Running ingestion on startup...")
+        logger.info("Running ingestion on startup...")
         _run_ingestion(config_file)
 
     # Start periodic ingestion if configured
@@ -1622,19 +1613,27 @@ def main():
     config_file = os.getenv("TERRAFORM_INGEST_CONFIG", "config.yaml")
     config = _load_config_file(config_file)
 
+    # Determine transport mode early so we can suppress logs in stdio mode
+    mcp_config = config.mcp if config and config.mcp else None
+    transport_mode = mcp_config.transport if mcp_config else "stdio"
+    stdio_mode = transport_mode == "stdio"
+
+    # Initialize MCPContext early with stdio_mode
+    MCPContext.set(
+        ingester=None,  # type: ignore
+        config=config,
+        vector_db_enabled=False,
+        stdio_mode=stdio_mode,
+    )
+
     # Update MCP instructions from configuration
     _update_mcp_instructions(config)
 
     # Initialize the TerraformIngest instance and set MCP context
-    ingester = TerraformIngest.from_yaml(config_file, logger=mcp_logger)
+    ingester = TerraformIngest.from_yaml(config_file, logger=logger)
     vector_db_enabled = (config and config.embedding and config.embedding.enabled) or (
         ingester.vector_db is not None
     )
-
-    # Determine transport from config or defaults
-    mcp_config = config.mcp if config and config.mcp else None
-    transport_mode = mcp_config.transport if mcp_config else "stdio"
-    stdio_mode = transport_mode == "stdio"
 
     set_mcp_context(ingester, config, vector_db_enabled, stdio_mode=stdio_mode)
 
@@ -1644,7 +1643,7 @@ def main():
     if mcp_config:
         # Run ingestion on startup if enabled
         if mcp_config.ingest_on_startup:
-            mcp_logger.info("MCP auto-ingestion enabled, running initial ingestion...")
+            logger.info("MCP auto-ingestion enabled, running initial ingestion...")
             _run_ingestion(config_file)
 
         # Start periodic ingestion if configured
@@ -1652,7 +1651,7 @@ def main():
             _start_periodic_ingestion(config, config_file)
 
     if transport_mode != "stdio":
-        mcp_logger.info(f"Listening on {bind_host}:{bind_port}")
+        logger.info(f"Listening on {bind_host}:{bind_port}")
 
     # Run with appropriate transport
     if transport_mode == "stdio":

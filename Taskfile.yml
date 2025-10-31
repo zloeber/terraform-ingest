@@ -226,3 +226,21 @@ tasks:
     cmds:
       - npx actions-up -y
   
+  mcp:scan:
+    desc: Scan MCP package for issues
+    env:
+      MCP_SCANNER_LLM_API_KEY: test
+      MCP_SCANNER_API_KEY: test
+      MCP_SCANNER_LLM_ENDPOINT: http://linbox5:11434
+      MCP_SCANNER_LLM_MODEL: gemma3:12b
+    cmds:
+      - |
+        uv tool install cisco-ai-mcp-scanner
+        uv tool upgrade cisco-ai-mcp-scanner
+        mcp-scanner --format summary \
+          --stdio-command uvx \
+          --stdio-arg=terraform-ingest --stdio-arg=mcp --stdio-arg=-c --stdio-arg=config.yaml \
+          --stdio-arg=--no-ingest-on-startup \
+          --format table \
+          --analyzers yara \
+          -o security_scan_results.md

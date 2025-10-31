@@ -11,7 +11,7 @@ from .models import (
     RepositoryConfig,
     TerraformModuleSummary,
 )
-from .ingest import TerraformIngest
+from terraform_ingest.ingest import TerraformIngest
 
 
 app = FastAPI(
