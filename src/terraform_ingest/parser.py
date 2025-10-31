@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 import hcl2
 import re
-from .models import (
+from terraform_ingest.models import (
     TerraformVariable,
     TerraformOutput,
     TerraformProvider,
@@ -12,7 +12,7 @@ from .models import (
     TerraformResource,
     TerraformModuleSummary,
 )
-from .logging import get_logger
+from terraform_ingest.tty_logger import get_logger
 
 
 class TerraformParser:

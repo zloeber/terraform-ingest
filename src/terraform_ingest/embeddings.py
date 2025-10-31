@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .models import EmbeddingConfig, TerraformModuleSummary
+from terraform_ingest.models import EmbeddingConfig, TerraformModuleSummary
 
 
 class EmbeddingStrategy(ABC):

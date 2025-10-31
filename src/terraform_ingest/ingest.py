@@ -9,7 +9,7 @@ from terraform_ingest.models import IngestConfig, TerraformModuleSummary
 from terraform_ingest.repository import RepositoryManager
 from terraform_ingest.embeddings import VectorDBManager
 from terraform_ingest.indexer import ModuleIndexer
-from terraform_ingest.logging import get_logger
+from terraform_ingest.tty_logger import get_logger
 from terraform_ingest.dependency_installer import ensure_embeddings_available
 
 

@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any, List, Optional
 import git
 from packaging.version import parse as parse_version, InvalidVersion
-from .models import RepositoryConfig, TerraformModuleSummary
-from .parser import TerraformParser
-from .logging import get_logger
+from terraform_ingest.models import RepositoryConfig, TerraformModuleSummary
+from terraform_ingest.parser import TerraformParser
+from terraform_ingest.tty_logger import get_logger
 
 
 class RepositoryManager:

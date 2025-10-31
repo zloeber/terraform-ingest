@@ -4,7 +4,44 @@ import subprocess
 import sys
 import site
 from typing import List
-from loguru import logger as default_logger
+
+from terraform_ingest.tty_logger import setup_tty_logger
+
+logger = setup_tty_logger()
+
+
+# def _get_appropriate_logger():
+#     """Get a logger appropriate for the current execution context.
+
+#     When running in stdio mode (MCP protocol), returns a logger that outputs to /dev/tty
+#     instead of stderr to avoid corrupting the JSON protocol messages. Otherwise returns
+#     a regular logger that outputs to stderr.
+
+#     Returns:
+#         UnifiedLogger instance configured for the appropriate output stream
+#     """
+#     global _cached_logger
+
+#     # Always check if we should update the cache based on current context
+#     try:
+#         from terraform_ingest.mcp_service import MCPContext
+
+#         context = MCPContext.get_instance()
+#         if context and context.stdio_mode:
+#             if (
+#                 _cached_logger is None
+#                 or not hasattr(_cached_logger.config, "console_file_object")
+#                 or _cached_logger.config.console_file_object is None
+#             ):
+#                 _cached_logger = get_silent_logger()
+#             return _cached_logger
+#     except Exception:
+#         # If we can't access MCPContext, just use a regular logger
+#         pass
+
+#     if _cached_logger is None:
+#         _cached_logger = get_logger(__name__)
+#     return _cached_logger
 
 
 class DependencyInstaller:
@@ -74,7 +111,7 @@ class DependencyInstaller:
                     if path not in sys.path:
                         sys.path.insert(0, path)
         except Exception as e:
-            default_logger.debug(f"Could not refresh sys.path: {e}")
+            logger.debug(f"Could not refresh sys.path: {e}")
 
     @staticmethod
     def get_missing_packages(packages: List[str]) -> List[str]:
@@ -95,7 +132,7 @@ class DependencyInstaller:
     @staticmethod
     def install_packages(
         packages: List[str],
-        logger=None,
+        logger=logger,
         use_uv: bool = True,
     ) -> bool:
         """Install packages using pip or uv.
@@ -110,8 +147,6 @@ class DependencyInstaller:
         """
         if not packages:
             return True
-
-        logger = logger or default_logger
 
         # Check if packages are already installed
         still_missing = DependencyInstaller.get_missing_packages(packages)
@@ -204,7 +239,7 @@ class DependencyInstaller:
 
     @staticmethod
     def ensure_embedding_packages(
-        logger=None,
+        logger=logger,
         strategy: str = "chromadb-default",
         auto_install: bool = True,
     ) -> bool:
@@ -218,8 +253,6 @@ class DependencyInstaller:
         Returns:
             True if all packages are installed or successfully installed, False otherwise
         """
-        logger = logger or default_logger
-
         # Get packages needed for the strategy
         if strategy not in DependencyInstaller.STRATEGY_PACKAGES:
             logger.warning(f"Unknown embedding strategy: {strategy}")
@@ -255,7 +288,7 @@ class DependencyInstaller:
 
 def ensure_embeddings_available(
     embedding_config,
-    logger=None,
+    logger=logger,
     auto_install: bool = True,
 ) -> bool:
     """Convenience function to ensure embeddings are available.
@@ -271,7 +304,6 @@ def ensure_embeddings_available(
     Raises:
         ImportError: If auto_install is False and packages are missing
     """
-    logger = logger or default_logger
 
     if not embedding_config or not embedding_config.enabled:
         logger.debug("Embeddings not enabled in configuration")
