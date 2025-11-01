@@ -1,8 +1,6 @@
 ````markdown
 # Terraform Ingest
 
-<!-- mcp-name: io.github.zloeber/terraform-ingest -->
-
 A Terraform RAG ingestion engine that accepts a YAML file of terraform git repository sources, downloads them locally using existing credentials, creates JSON summaries of their purpose, inputs, outputs, and providers for branches or tagged releases you specify and embeds them into a vector database for similarity searches. Includes an easy to use cli, API, or MCP server.
 
 ## Features
@@ -64,3 +62,5 @@ MIT License
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+<!-- mcp-name: io.github.zloeber/terraform-ingest -->
