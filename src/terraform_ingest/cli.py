@@ -1719,6 +1719,402 @@ def gitlab(
         raise click.Abort()
 
 
+@cli.group()
+def config():
+    """Manage configuration file settings.
+
+    This command group provides tools to read and update configuration files.
+    Use 'set' and 'get' for single values, and 'add-repo' or 'remove-repo'
+    for managing repository entries.
+
+    Example:
+
+        terraform-ingest config set --target output_dir --value ./my-output
+
+        terraform-ingest config get --target clone_dir
+
+        terraform-ingest config add-repo --url https://github.com/org/repo
+
+        terraform-ingest config remove-repo --url https://github.com/org/repo
+    """
+    pass
+
+
+@config.command(name="set")
+@click.option(
+    "--config",
+    "-c",
+    type=click.Path(),
+    default="config.yaml",
+    help="Configuration file to update (default: config.yaml)",
+)
+@click.option(
+    "--target",
+    "-t",
+    required=True,
+    help="Configuration path to set (e.g., 'output_dir', 'embedding.enabled')",
+)
+@click.option(
+    "--value",
+    "-v",
+    required=True,
+    help="Value to set (use 'true'/'false' for booleans, numbers for integers)",
+)
+def config_set(config, target, value):
+    """Set a configuration value.
+
+    TARGET should be a dot-separated path to the configuration key.
+    For nested values, use dots to separate levels (e.g., 'embedding.enabled').
+
+    VALUE will be automatically converted to the appropriate type:
+    - 'true' or 'false' becomes boolean
+    - Numeric strings become integers or floats
+    - Everything else remains a string
+
+    Example:
+
+        terraform-ingest config set --target output_dir --value ./output
+
+        terraform-ingest config set --target embedding.enabled --value true
+
+        terraform-ingest config set --target mcp.port --value 3000
+    """
+    try:
+        config_path = Path(config)
+
+        # Load existing configuration
+        if not config_path.exists():
+            click.echo(f"Error: Configuration file not found: {config}", err=True)
+            raise click.Abort()
+
+        with open(config_path, "r") as f:
+            config_data = yaml.safe_load(f) or {}
+
+        # Parse the target path
+        path_parts = target.split(".")
+
+        # Convert value to appropriate type
+        converted_value = _convert_value(value)
+
+        # Navigate to the target location and set the value
+        current = config_data
+        for i, part in enumerate(path_parts[:-1]):
+            if part not in current:
+                current[part] = {}
+            elif not isinstance(current[part], dict):
+                click.echo(
+                    f"Error: Cannot set nested value - '{'.'.join(path_parts[:i+1])}' is not a dictionary",
+                    err=True,
+                )
+                raise click.Abort()
+            current = current[part]
+
+        # Set the final value
+        current[path_parts[-1]] = converted_value
+
+        # Write back to file
+        with open(config_path, "w") as f:
+            yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
+
+        click.echo(f"✓ Set {target} = {converted_value}")
+
+    except Exception as e:
+        click.echo(f"Error setting configuration value: {e}", err=True)
+        raise click.Abort()
+
+
+@config.command(name="get")
+@click.option(
+    "--config",
+    "-c",
+    type=click.Path(exists=True),
+    default="config.yaml",
+    help="Configuration file to read (default: config.yaml)",
+)
+@click.option(
+    "--target",
+    "-t",
+    required=True,
+    help="Configuration path to get (e.g., 'output_dir', 'embedding.enabled')",
+)
+@click.option(
+    "--json",
+    "-j",
+    "output_json",
+    is_flag=True,
+    default=False,
+    help="Output as JSON",
+)
+def config_get(config, target, output_json):
+    """Get a configuration value.
+
+    TARGET should be a dot-separated path to the configuration key.
+    For nested values, use dots to separate levels (e.g., 'embedding.enabled').
+
+    Example:
+
+        terraform-ingest config get --target output_dir
+
+        terraform-ingest config get --target embedding.enabled
+
+        terraform-ingest config get --target mcp --json
+    """
+    try:
+        config_path = Path(config)
+
+        with open(config_path, "r") as f:
+            config_data = yaml.safe_load(f) or {}
+
+        # Parse the target path
+        path_parts = target.split(".")
+
+        # Navigate to the target location
+        current = config_data
+        for part in path_parts:
+            if not isinstance(current, dict) or part not in current:
+                click.echo(f"Error: Configuration key not found: {target}", err=True)
+                raise click.Abort()
+            current = current[part]
+
+        # Output the value
+        if output_json:
+            click.echo(json.dumps(current, indent=2, default=str))
+        else:
+            if isinstance(current, (dict, list)):
+                click.echo(yaml.dump(current, default_flow_style=False))
+            else:
+                click.echo(current)
+
+    except Exception as e:
+        click.echo(f"Error getting configuration value: {e}", err=True)
+        raise click.Abort()
+
+
+@config.command(name="add-repo")
+@click.option(
+    "--config",
+    "-c",
+    type=click.Path(),
+    default="config.yaml",
+    help="Configuration file to update (default: config.yaml)",
+)
+@click.option(
+    "--url",
+    required=True,
+    help="Repository URL",
+)
+@click.option(
+    "--name",
+    default=None,
+    help="Repository name (optional)",
+)
+@click.option(
+    "--branches",
+    default="",
+    help="Comma-separated list of branches to include",
+)
+@click.option(
+    "--include-tags/--no-include-tags",
+    default=True,
+    help="Include git tags in analysis",
+)
+@click.option(
+    "--max-tags",
+    type=int,
+    default=1,
+    help="Maximum number of tags to include",
+)
+@click.option(
+    "--path",
+    default=".",
+    help="Base path for module scanning",
+)
+@click.option(
+    "--recursive/--no-recursive",
+    default=False,
+    help="Recursively search for terraform modules",
+)
+def config_add_repo(
+    config, url, name, branches, include_tags, max_tags, path, recursive
+):
+    """Add a repository to the configuration.
+
+    This command adds a new repository entry to the repositories array
+    in the configuration file.
+
+    Example:
+
+        terraform-ingest config add-repo --url https://github.com/org/repo
+
+        terraform-ingest config add-repo --url https://github.com/org/repo --name my-repo --branches main,develop
+
+        terraform-ingest config add-repo --url https://github.com/org/repo --recursive --max-tags 5
+    """
+    try:
+        config_path = Path(config)
+
+        # Load existing configuration
+        if not config_path.exists():
+            click.echo(f"Error: Configuration file not found: {config}", err=True)
+            raise click.Abort()
+
+        with open(config_path, "r") as f:
+            config_data = yaml.safe_load(f) or {}
+
+        # Parse branches
+        branches_list = [b.strip() for b in branches.split(",") if b.strip()]
+
+        # Create new repository config
+        new_repo = RepositoryConfig(
+            url=url,
+            name=name,
+            branches=branches_list,
+            include_tags=include_tags,
+            max_tags=max_tags,
+            path=path,
+            recursive=recursive,
+        )
+
+        # Ensure repositories array exists
+        if "repositories" not in config_data:
+            config_data["repositories"] = []
+
+        # Check if repository with same URL already exists
+        existing_repos = config_data["repositories"]
+        for repo in existing_repos:
+            if repo.get("url") == url:
+                click.echo(
+                    f"Warning: Repository with URL '{url}' already exists in configuration",
+                    err=True,
+                )
+                click.echo(
+                    "Use 'config set' to update specific values or remove the repository first."
+                )
+                raise click.Abort()
+
+        # Add new repository
+        config_data["repositories"].append(new_repo.model_dump())
+
+        # Write back to file
+        with open(config_path, "w") as f:
+            yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
+
+        click.echo(f"✓ Added repository: {url}")
+        if name:
+            click.echo(f"  Name: {name}")
+        click.echo(f"  Branches: {branches_list if branches_list else '(none)'}")
+        click.echo(f"  Include tags: {include_tags}")
+        click.echo(f"  Max tags: {max_tags}")
+        click.echo(f"  Path: {path}")
+        click.echo(f"  Recursive: {recursive}")
+
+    except Exception as e:
+        click.echo(f"Error adding repository: {e}", err=True)
+        raise click.Abort()
+
+
+@config.command(name="remove-repo")
+@click.option(
+    "--config",
+    "-c",
+    type=click.Path(exists=True),
+    default="config.yaml",
+    help="Configuration file to update (default: config.yaml)",
+)
+@click.option(
+    "--url",
+    help="Repository URL to remove",
+)
+@click.option(
+    "--name",
+    help="Repository name to remove",
+)
+def config_remove_repo(config, url, name):
+    """Remove a repository from the configuration.
+
+    Specify either --url or --name to identify the repository to remove.
+
+    Example:
+
+        terraform-ingest config remove-repo --url https://github.com/org/repo
+
+        terraform-ingest config remove-repo --name my-repo
+    """
+    try:
+        if not url and not name:
+            click.echo("Error: Must specify either --url or --name", err=True)
+            raise click.Abort()
+
+        config_path = Path(config)
+
+        with open(config_path, "r") as f:
+            config_data = yaml.safe_load(f) or {}
+
+        # Get repositories array
+        if "repositories" not in config_data or not config_data["repositories"]:
+            click.echo("No repositories found in configuration")
+            return
+
+        # Find and remove the repository
+        repositories = config_data["repositories"]
+        removed = False
+        removed_repo = None
+
+        for i, repo in enumerate(repositories):
+            if (url and repo.get("url") == url) or (name and repo.get("name") == name):
+                removed_repo = repositories.pop(i)
+                removed = True
+                break
+
+        if not removed:
+            identifier = f"URL '{url}'" if url else f"name '{name}'"
+            click.echo(f"Error: Repository with {identifier} not found", err=True)
+            raise click.Abort()
+
+        # Write back to file
+        with open(config_path, "w") as f:
+            yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
+
+        click.echo(
+            f"✓ Removed repository: {removed_repo.get('url', removed_repo.get('name'))}"
+        )
+
+    except Exception as e:
+        click.echo(f"Error removing repository: {e}", err=True)
+        raise click.Abort()
+
+
+def _convert_value(value: str):
+    """Convert a string value to the appropriate type.
+
+    Args:
+        value: String value to convert
+
+    Returns:
+        Converted value (bool, int, float, or str)
+    """
+    # Try boolean
+    if value.lower() in ("true", "yes", "on", "1"):
+        return True
+    if value.lower() in ("false", "no", "off", "0"):
+        return False
+
+    # Try integer
+    try:
+        return int(value)
+    except ValueError:
+        pass
+
+    # Try float
+    try:
+        return float(value)
+    except ValueError:
+        pass
+
+    # Return as string
+    return value
+
+
 def main():
     """Entry point for the CLI."""
     cli()
