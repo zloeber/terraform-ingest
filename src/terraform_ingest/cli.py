@@ -1803,7 +1803,7 @@ def config_set(config, target, value):
                 current[part] = {}
             elif not isinstance(current[part], dict):
                 click.echo(
-                    f"Error: Cannot set nested value - '{'.'.join(path_parts[:i+1])}' is not a dictionary",
+                    f"Error: Cannot set nested value - '{'.'.join(path_parts[: i + 1])}' is not a dictionary",
                     err=True,
                 )
                 raise click.Abort()
