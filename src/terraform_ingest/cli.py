@@ -87,6 +87,12 @@ def cli():
     default=False,
     help="Skip cloning if repository already exists in local cache",
 )
+@click.option(
+    "--chromadb-path",
+    "-db",
+    default=None,
+    help="Path to ChromaDB storage directory (overrides config)",
+)
 def ingest(
     config_file,
     output_dir,
@@ -97,6 +103,7 @@ def ingest(
     embedding_strategy,
     auto_install_deps,
     skip_existing,
+    chromadb_path,
 ):
     """Ingest terraform repositories from a YAML configuration file.
 
@@ -111,6 +118,8 @@ def ingest(
         terraform-ingest ingest config.yaml --enable-embeddings --embedding-strategy sentence-transformers
 
         terraform-ingest ingest config.yaml --skip-existing
+
+        terraform-ingest ingest config.yaml --chromadb-path /custom/chromadb/path
     """
     click.echo(f"Loading configuration from {config_file}")
 
@@ -145,9 +154,20 @@ def ingest(
                 ingester.config.embedding = EmbeddingConfig()
             ingester.config.embedding.strategy = embedding_strategy
 
+        if chromadb_path is not None:
+            if ingester.config.embedding is None:
+                from terraform_ingest.models import EmbeddingConfig
+
+                ingester.config.embedding = EmbeddingConfig()
+            ingester.config.embedding.chromadb_path = chromadb_path
+
         # Reinitialize vector DB if embedding config was overridden
         if (
-            (enable_embeddings is not None or embedding_strategy is not None)
+            (
+                enable_embeddings is not None
+                or embedding_strategy is not None
+                or chromadb_path is not None
+            )
             and ingester.config.embedding
             and ingester.config.embedding.enabled
         ):
