@@ -1854,8 +1854,9 @@ def config_set(config, target, value):
 @click.option(
     "--target",
     "-t",
-    required=True,
-    help="Configuration path to get (e.g., 'output_dir', 'embedding.enabled')",
+    required=False,
+    default=None,
+    help="Configuration path to get (e.g., 'output_dir', 'embedding.enabled'). If not provided, shows entire config.",
 )
 @click.option(
     "--json",
@@ -1866,24 +1867,37 @@ def config_set(config, target, value):
     help="Output as JSON",
 )
 def config_get(config, target, output_json):
-    """Get a configuration value.
+    """Get a configuration value or show entire configuration.
 
     TARGET should be a dot-separated path to the configuration key.
     For nested values, use dots to separate levels (e.g., 'embedding.enabled').
+    If TARGET is not provided, the entire configuration is displayed.
 
     Example:
+
+        terraform-ingest config get
 
         terraform-ingest config get --target output_dir
 
         terraform-ingest config get --target embedding.enabled
 
         terraform-ingest config get --target mcp --json
+
+        terraform-ingest config get --json
     """
     try:
         config_path = Path(config)
 
         with open(config_path, "r") as f:
             config_data = yaml.safe_load(f) or {}
+
+        # If no target is specified, show the entire configuration
+        if target is None:
+            if output_json:
+                click.echo(json.dumps(config_data, indent=2, default=str))
+            else:
+                click.echo(yaml.dump(config_data, default_flow_style=False))
+            return
 
         # Parse the target path
         path_parts = target.split(".")

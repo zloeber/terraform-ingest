@@ -358,6 +358,34 @@ class TestConfigGet:
         assert result.exit_code != 0
         assert "Configuration key not found" in result.output
 
+    def test_get_entire_config_as_yaml(self, runner, sample_config):
+        """Test getting entire configuration without target (YAML output)."""
+        result = runner.invoke(
+            cli,
+            ["config", "get", "--config", str(sample_config)],
+        )
+        assert result.exit_code == 0
+        # Check that entire config is shown
+        assert "repositories:" in result.output
+        assert "output_dir:" in result.output
+        assert "clone_dir:" in result.output
+        assert "embedding:" in result.output
+        assert "mcp:" in result.output
+
+    def test_get_entire_config_as_json(self, runner, sample_config):
+        """Test getting entire configuration without target (JSON output)."""
+        result = runner.invoke(
+            cli,
+            ["config", "get", "--config", str(sample_config), "--json"],
+        )
+        assert result.exit_code == 0
+        # Check that entire config is shown as JSON
+        assert '"repositories"' in result.output
+        assert '"output_dir"' in result.output
+        assert '"clone_dir"' in result.output
+        assert '"embedding"' in result.output
+        assert '"mcp"' in result.output
+
 
 class TestConfigAddRepo:
     """Tests for config add-repo command."""
