@@ -1988,7 +1988,8 @@ def config_add_repo(
                     err=True,
                 )
                 click.echo(
-                    "Use 'config set' to update specific values or remove the repository first."
+                    "Use 'config set' to update specific values or remove the repository first.",
+                    err=True,
                 )
                 raise click.Abort()
 
@@ -2087,11 +2088,29 @@ def config_remove_repo(config, url, name):
 def _convert_value(value: str):
     """Convert a string value to the appropriate type.
 
+    Attempts to convert the value to boolean, integer, float, or returns
+    as string if no conversion is possible.
+
     Args:
         value: String value to convert
 
     Returns:
         Converted value (bool, int, float, or str)
+
+    Examples:
+        >>> _convert_value("true")
+        True
+        >>> _convert_value("42")
+        42
+        >>> _convert_value("3.14")
+        3.14
+        >>> _convert_value("hello")
+        'hello'
+
+    Note:
+        Boolean conversions:
+        - True: "true", "yes", "on", "1"
+        - False: "false", "no", "off", "0"
     """
     # Try boolean
     if value.lower() in ("true", "yes", "on", "1"):
