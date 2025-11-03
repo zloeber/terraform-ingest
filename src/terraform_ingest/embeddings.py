@@ -1,6 +1,7 @@
 """Vector database embeddings for Terraform modules."""
 
 import hashlib
+import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
@@ -182,6 +183,11 @@ class VectorDBManager:
             ) from e
 
         try:
+            # Determine chromadb path with precedence: env var > config
+            chromadb_path = os.getenv(
+                "TERRAFORM_INGEST_CHROMADB_PATH", self.config.chromadb_path
+            )
+
             # Initialize client
             if self.config.chromadb_host:
                 # Client/server mode
@@ -190,9 +196,9 @@ class VectorDBManager:
                 )
             else:
                 # Persistent local mode
-                Path(self.config.chromadb_path).mkdir(parents=True, exist_ok=True)
+                Path(chromadb_path).mkdir(parents=True, exist_ok=True)
                 self.client = chromadb.PersistentClient(
-                    path=self.config.chromadb_path,
+                    path=chromadb_path,
                     settings=Settings(anonymized_telemetry=False),
                 )
 

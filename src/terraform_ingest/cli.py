@@ -87,6 +87,12 @@ def cli():
     default=False,
     help="Skip cloning if repository already exists in local cache",
 )
+@click.option(
+    "--chromadb-path",
+    "-db",
+    default=None,
+    help="Path to ChromaDB storage directory (overrides config)",
+)
 def ingest(
     config_file,
     output_dir,
@@ -97,6 +103,7 @@ def ingest(
     embedding_strategy,
     auto_install_deps,
     skip_existing,
+    chromadb_path,
 ):
     """Ingest terraform repositories from a YAML configuration file.
 
@@ -111,6 +118,8 @@ def ingest(
         terraform-ingest ingest config.yaml --enable-embeddings --embedding-strategy sentence-transformers
 
         terraform-ingest ingest config.yaml --skip-existing
+
+        terraform-ingest ingest config.yaml --chromadb-path /custom/chromadb/path
     """
     click.echo(f"Loading configuration from {config_file}")
 
@@ -145,9 +154,20 @@ def ingest(
                 ingester.config.embedding = EmbeddingConfig()
             ingester.config.embedding.strategy = embedding_strategy
 
+        if chromadb_path is not None:
+            if ingester.config.embedding is None:
+                from terraform_ingest.models import EmbeddingConfig
+
+                ingester.config.embedding = EmbeddingConfig()
+            ingester.config.embedding.chromadb_path = chromadb_path
+
         # Reinitialize vector DB if embedding config was overridden
         if (
-            (enable_embeddings is not None or embedding_strategy is not None)
+            (
+                enable_embeddings is not None
+                or embedding_strategy is not None
+                or chromadb_path is not None
+            )
             and ingester.config.embedding
             and ingester.config.embedding.enabled
         ):
@@ -1834,8 +1854,9 @@ def config_set(config, target, value):
 @click.option(
     "--target",
     "-t",
-    required=True,
-    help="Configuration path to get (e.g., 'output_dir', 'embedding.enabled')",
+    required=False,
+    default=None,
+    help="Configuration path to get (e.g., 'output_dir', 'embedding.enabled'). If not provided, shows entire config.",
 )
 @click.option(
     "--json",
@@ -1846,24 +1867,37 @@ def config_set(config, target, value):
     help="Output as JSON",
 )
 def config_get(config, target, output_json):
-    """Get a configuration value.
+    """Get a configuration value or show entire configuration.
 
     TARGET should be a dot-separated path to the configuration key.
     For nested values, use dots to separate levels (e.g., 'embedding.enabled').
+    If TARGET is not provided, the entire configuration is displayed.
 
     Example:
+
+        terraform-ingest config get
 
         terraform-ingest config get --target output_dir
 
         terraform-ingest config get --target embedding.enabled
 
         terraform-ingest config get --target mcp --json
+
+        terraform-ingest config get --json
     """
     try:
         config_path = Path(config)
 
         with open(config_path, "r") as f:
             config_data = yaml.safe_load(f) or {}
+
+        # If no target is specified, show the entire configuration
+        if target is None:
+            if output_json:
+                click.echo(json.dumps(config_data, indent=2, default=str))
+            else:
+                click.echo(yaml.dump(config_data, default_flow_style=False))
+            return
 
         # Parse the target path
         path_parts = target.split(".")
