@@ -6,7 +6,7 @@ A Terraform RAG ingestion engine that accepts a YAML file of terraform git repos
 ## Features
 
 - 📥 **Multi-Repository Ingestion**: Process multiple Terraform repositories from a single YAML configuration
-- 🔄 **Auto-Import**: Import repositories from GitHub organizations (GitLab, Bitbucket support coming soon)
+- 🔄 **Auto-Import**: Import repositories from GitHub organizations and GitLab groups (Bitbucket support coming soon)
 - 🔍 **Comprehensive Analysis**: Extracts variables, outputs, providers, modules, and descriptions
 - 🏷️ **Branch & Tag Support**: Analyzes both branches and git tags of your choosing
 - 🔌 **Dual Interface**: Use as a CLI tool (Click) or as a REST API service (FastAPI)
@@ -35,6 +35,9 @@ uv run terraform-ingest init config.yaml
 
 # Or import repositories from a GitHub organization
 uv run terraform-ingest import github --org terraform-aws-modules --terraform-only
+
+# Or import repositories from a GitLab group
+uv run terraform-ingest import gitlab --group mygroup --recursive --terraform-only
 
 # Update your config.yaml file to include your terraform module information and mcp config then preform the initial ingestion
 uv run terraform-ingest ingest config.yaml

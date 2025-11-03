@@ -190,6 +190,204 @@ class GitHubImporter(RepositoryImporter):
             return True  # Include by default if check fails
 
 
+class GitLabImporter(RepositoryImporter):
+    """Importer for GitLab repositories."""
+
+    def __init__(
+        self,
+        group: str,
+        token: Optional[str] = None,
+        include_private: bool = False,
+        terraform_only: bool = False,
+        base_path: str = ".",
+        recursive: bool = True,
+        gitlab_url: str = "https://gitlab.com",
+    ):
+        """Initialize GitLab importer.
+
+        Args:
+            group: GitLab group name or ID
+            token: GitLab personal access token
+            include_private: Include private repositories
+            terraform_only: Only include repositories with Terraform files
+            base_path: Base path for module scanning
+            recursive: Recursively fetch repositories from subgroups
+            gitlab_url: GitLab instance URL (default: https://gitlab.com)
+        """
+        self.group = group
+        self.token = token
+        self.include_private = include_private
+        self.terraform_only = terraform_only
+        self.base_path = base_path
+        self.recursive = recursive
+        self.gitlab_url = gitlab_url.rstrip("/")
+        self.headers = {}
+        if token:
+            self.headers["PRIVATE-TOKEN"] = token
+
+    def get_provider_name(self) -> str:
+        """Get the provider name."""
+        return "gitlab"
+
+    def fetch_repositories(self, **kwargs) -> List[RepositoryConfig]:
+        """Fetch repositories from GitLab group.
+
+        Returns:
+            List of RepositoryConfig objects.
+
+        Raises:
+            click.ClickException: If there's an error fetching repositories.
+        """
+        repositories = []
+
+        click.echo(f"Fetching repositories from GitLab group: {self.group}", err=True)
+
+        # Fetch projects from the group
+        projects = self._fetch_group_projects(self.group)
+
+        for project in projects:
+            # Skip archived projects
+            if project.get("archived", False):
+                continue
+
+            # Skip if filtering for Terraform repos only
+            if self.terraform_only and not self._has_terraform_files(project):
+                continue
+
+            # Skip private projects if not including them
+            if not self.include_private and project.get("visibility") == "private":
+                continue
+
+            repo_config = RepositoryConfig(
+                name=project["name"],
+                url=project["http_url_to_repo"],
+                branches=[],
+                include_tags=True,
+                max_tags=1,
+                path=self.base_path,
+                recursive=False,
+                exclude_paths=[],
+            )
+            repositories.append(repo_config)
+
+        click.echo(f"Found {len(repositories)} repositories", err=True)
+        return repositories
+
+    def _fetch_group_projects(self, group: str) -> List[Dict[str, Any]]:
+        """Fetch all projects from a GitLab group.
+
+        Args:
+            group: Group name or ID
+
+        Returns:
+            List of project dictionaries from GitLab API
+        """
+        projects = []
+        page = 1
+        per_page = 100
+
+        while True:
+            url = f"{self.gitlab_url}/api/v4/groups/{group}/projects"
+            params = {
+                "page": page,
+                "per_page": per_page,
+                "include_subgroups": self.recursive,
+                "with_shared": False,
+            }
+
+            try:
+                response = requests.get(url, headers=self.headers, params=params)
+                response.raise_for_status()
+            except requests.exceptions.RequestException as e:
+                raise click.ClickException(f"Error fetching projects: {e}")
+
+            page_projects = response.json()
+            if not page_projects:
+                break
+
+            projects.extend(page_projects)
+            page += 1
+            click.echo(
+                f"Processed page {page - 1} ({len(page_projects)} projects)", err=True
+            )
+
+        return projects
+
+    def _has_terraform_files(self, project: Dict[str, Any]) -> bool:
+        """Check if a project contains Terraform files.
+
+        Args:
+            project: Project data from GitLab API
+
+        Returns:
+            True if project contains .tf files, False otherwise.
+        """
+        project_id = project.get("id")
+        project_name = project.get("name", "unknown")
+
+        if not project_id:
+            return True  # Include by default if we can't get project ID
+
+        try:
+            # Use repository tree API to search for .tf files
+            url = f"{self.gitlab_url}/api/v4/projects/{project_id}/repository/tree"
+            params = {
+                "recursive": True,
+                "per_page": 1,
+            }
+
+            response = requests.get(url, headers=self.headers, params=params)
+
+            if response.status_code == 200:
+                tree_items = response.json()
+                # Check if any file has .tf extension
+                for item in tree_items:
+                    if item.get("type") == "blob" and item.get("name", "").endswith(
+                        ".tf"
+                    ):
+                        return True
+
+                # If we got results but no .tf files, check more carefully
+                # Make a more specific search
+                url = f"{self.gitlab_url}/api/v4/projects/{project_id}/repository/tree"
+                params = {"recursive": True, "per_page": 100}
+                response = requests.get(url, headers=self.headers, params=params)
+
+                if response.status_code == 200:
+                    tree_items = response.json()
+                    for item in tree_items:
+                        if item.get("type") == "blob" and item.get("name", "").endswith(
+                            ".tf"
+                        ):
+                            return True
+                    return False
+                else:
+                    return True  # Include by default if we can't check
+            elif response.status_code == 403:
+                click.echo(
+                    f"Warning: Cannot check Terraform files for {project_name} "
+                    f"(GitLab API returned 403 - verify token permissions)",
+                    err=True,
+                )
+                return True  # Include by default
+            elif response.status_code == 404:
+                # Repository might be empty
+                click.echo(
+                    f"Warning: Repository appears empty for {project_name}",
+                    err=True,
+                )
+                return False
+            else:
+                return True  # Include by default if check fails
+        except Exception as e:
+            # Log the exception for debugging but don't fail the whole operation
+            click.echo(
+                f"Warning: Error checking Terraform files for {project_name}: {e}",
+                err=True,
+            )
+            return True  # Include by default if check fails
+
+
 def merge_repositories(
     existing_repos: List[RepositoryConfig],
     new_repos: List[RepositoryConfig],

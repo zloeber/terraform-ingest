@@ -14,7 +14,11 @@ from terraform_ingest import __version__, CONFIG_PATH
 from terraform_ingest.mcp_service import start as mcp_main
 from terraform_ingest.mcp_service import _get_module_resource_impl, ModuleQueryService
 from terraform_ingest.indexer import ModuleIndexer
-from terraform_ingest.importers import GitHubImporter, update_config_file
+from terraform_ingest.importers import (
+    GitHubImporter,
+    GitLabImporter,
+    update_config_file,
+)
 from terraform_ingest.dependency_installer import DependencyInstaller
 
 # from terraform_ingest.logging import get_logger
@@ -1563,6 +1567,133 @@ def github(
             include_private=include_private,
             terraform_only=terraform_only,
             base_path=base_path,
+        )
+
+        # Fetch repositories
+        repos = importer.fetch_repositories()
+
+        if not repos:
+            click.echo("No repositories found matching criteria", err=True)
+            return
+
+        # Apply max_tags and branches to all repositories
+        for repo in repos:
+            repo.max_tags = max_tags
+            repo.branches = branches_list
+
+        # Update configuration file
+        update_config_file(config_path, repos, replace=replace)
+
+        mode = "Replaced" if replace else "Merged"
+        click.echo(f"{mode} {len(repos)} repositories in {config_path}")
+
+    except Exception as e:
+        click.echo(f"Error importing repositories: {e}", err=True)
+        raise click.Abort()
+
+
+@import_cmd.command()
+@click.option("--group", required=True, help="GitLab group name or ID")
+@click.option(
+    "--token",
+    envvar="GITLAB_TOKEN",
+    help="GitLab personal access token (or set GITLAB_TOKEN env var)",
+)
+@click.option(
+    "--config",
+    "-c",
+    type=click.Path(),
+    default="config.yaml",
+    help="Configuration file to update (default: config.yaml)",
+)
+@click.option(
+    "--include-private",
+    is_flag=True,
+    help="Include private repositories (requires authentication)",
+)
+@click.option(
+    "--terraform-only",
+    is_flag=True,
+    help="Only include repositories that contain Terraform files",
+)
+@click.option(
+    "--base-path",
+    default=".",
+    help="Base path for module scanning (default: .)",
+)
+@click.option(
+    "--replace",
+    is_flag=True,
+    help="Replace existing repositories instead of merging",
+)
+@click.option(
+    "--max-tags",
+    type=int,
+    default=1,
+    help="Maximum number of tags to include per repository (default: 1)",
+)
+@click.option(
+    "--branches",
+    type=str,
+    default="",
+    help="Comma-separated list of branches to include (default: empty)",
+)
+@click.option(
+    "--recursive/--no-recursive",
+    default=True,
+    help="Recursively fetch repositories from subgroups (default: true)",
+)
+@click.option(
+    "--gitlab-url",
+    default="https://gitlab.com",
+    help="GitLab instance URL (default: https://gitlab.com)",
+)
+def gitlab(
+    group: str,
+    token: str,
+    config: str,
+    include_private: bool,
+    terraform_only: bool,
+    base_path: str,
+    replace: bool,
+    max_tags: int,
+    branches: str,
+    recursive: bool,
+    gitlab_url: str,
+) -> None:
+    """Import repositories from a GitLab group.
+
+    This command fetches all repositories from a GitLab group (optionally
+    including subgroups) and adds them to your configuration file. By default,
+    it merges with existing repositories. Use --replace to override the existing list.
+
+    Example:
+
+        terraform-ingest import gitlab --group mygroup
+
+        terraform-ingest import gitlab --group mygroup --token glpat-xxx --terraform-only
+
+        terraform-ingest import gitlab --group mygroup --replace --config my-config.yaml
+
+        terraform-ingest import gitlab --group mygroup --max-tags 5 --branches main,develop
+
+        terraform-ingest import gitlab --group mygroup --recursive --gitlab-url https://gitlab.example.com
+    """
+    try:
+        config_path = Path(config)
+
+        # Parse branches from comma-separated string
+        branches_list = [b.strip() for b in branches.split(",") if b.strip()]
+
+        # Create importer
+        importer = GitLabImporter(
+            group=group,
+            token=token,
+            include_private=include_private,
+            terraform_only=terraform_only,
+            base_path=base_path,
+            recursive=recursive,
+            gitlab_url=gitlab_url,
         )
 
         # Fetch repositories
