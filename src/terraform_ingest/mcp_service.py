@@ -191,6 +191,10 @@ class ModuleQueryService:
         Returns:
             List of matching module summaries
         """
+        # Validate query parameter (None check)
+        if query is None:
+            return []
+
         summaries = self._load_all_summaries()
         results = []
 
@@ -639,6 +643,15 @@ def search_modules(
         - modules: Sub-modules used
         - readme_content: README file content
     """
+    # Validate query parameter (None check)
+    if query is None:
+        return [
+            {
+                "error": "query parameter is required",
+                "message": "Please provide a search query",
+            }
+        ]
+
     service = get_service(output_dir)
 
     return service.search_modules(query=query, repo_urls=repo_urls, provider=provider)
@@ -676,6 +689,13 @@ def get_module_details(
         - readme_content: Full README file content
         Or None if the module is not found.
     """
+    # Validate required parameters
+    if repository is None or ref is None or path is None:
+        return {
+            "error": "Missing required parameters",
+            "message": "repository, ref, and path are all required",
+        }
+
     service = get_service(output_dir)
     return service.get_module(repository=repository, ref=ref, path=path)
 
@@ -736,6 +756,15 @@ def list_module_resources(
         - type: Resource type (e.g., "aws_vpc", "aws_security_group")
         - name: Resource name as defined in the module
     """
+    # Validate required parameters
+    if repository is None or ref is None:
+        return [
+            {
+                "error": "Missing required parameters",
+                "message": "repository and ref are required",
+            }
+        ]
+
     service = get_service(output_dir)
     return service.list_module_resources(repository=repository, ref=ref, path=path)
 
@@ -767,6 +796,15 @@ def list_module_versions(
         - outputs_count: Number of outputs
         - resources_count: Number of resources
     """
+    # Validate required parameters
+    if repository is None:
+        return [
+            {
+                "error": "Missing required parameter",
+                "message": "repository is required",
+            }
+        ]
+
     service = get_service(output_dir)
     return service.list_module_versions(repository=repository, path=path)
 
@@ -798,6 +836,15 @@ def search_modules_vector(
         - distance: Similarity score (lower is better)
     """
     try:
+        # Validate query parameter (None check)
+        if query is None:
+            return [
+                {
+                    "error": "query parameter is required",
+                    "message": "Please provide a search query",
+                }
+            ]
+
         # Get the ingester from the MCP context
         ctx = MCPContext.get_instance()
         if not ctx.ingester or not ctx.ingester.vector_db:
@@ -1409,6 +1456,13 @@ def _get_module_details_impl(
     output_dir: str = "./output",
 ) -> Optional[Dict[str, Any]]:
     """Implementation of get_module_details for testing."""
+    # Validate required parameters
+    if repository is None or ref is None or path is None:
+        return {
+            "error": "Missing required parameters",
+            "message": "repository, ref, and path are all required",
+        }
+
     service = ModuleQueryService(output_dir)
     return service.get_module(repository=repository, ref=ref, path=path)
 
@@ -1429,8 +1483,36 @@ def _list_module_resources_impl(
     output_dir: str = "./output",
 ) -> List[Dict[str, Any]]:
     """Implementation of list_module_resources for testing."""
+    # Validate required parameters
+    if repository is None or ref is None:
+        return [
+            {
+                "error": "Missing required parameters",
+                "message": "repository and ref are required",
+            }
+        ]
+
     service = ModuleQueryService(output_dir)
     return service.list_module_resources(repository=repository, ref=ref, path=path)
+
+
+def _list_module_versions_impl(
+    repository: str,
+    path: str = ".",
+    output_dir: str = "./output",
+) -> List[Dict[str, Any]]:
+    """Implementation of list_module_versions for testing."""
+    # Validate required parameters
+    if repository is None:
+        return [
+            {
+                "error": "Missing required parameter",
+                "message": "repository is required",
+            }
+        ]
+
+    service = ModuleQueryService(output_dir)
+    return service.list_module_versions(repository=repository, path=path)
 
 
 def _list_module_resource_uris_impl(

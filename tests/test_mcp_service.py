@@ -232,6 +232,15 @@ def test_search_modules_combined_filters(sample_output_dir):
     assert all("aws" in str(r.get("providers", [])).lower() for r in results)
 
 
+def test_search_modules_with_none_query(sample_output_dir):
+    """Test that None query is handled gracefully."""
+    service = ModuleQueryService(sample_output_dir)
+
+    # None query should return empty list
+    results = service.search_modules(query=None)
+    assert results == []
+
+
 def test_empty_output_dir():
     """Test with empty output directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -328,6 +337,10 @@ def test_mcp_search_modules_tool(sample_output_dir):
 def test_mcp_search_modules_edge_cases(sample_output_dir):
     """Test search_modules with edge cases."""
     from terraform_ingest.mcp_service import _search_modules_impl
+
+    # None query should return empty list (graceful handling)
+    results_none = _search_modules_impl(query=None, output_dir=sample_output_dir)
+    assert results_none == []
 
     # Empty query should still work (searches all)
     results = _search_modules_impl(query="", output_dir=sample_output_dir)
@@ -583,6 +596,59 @@ def test_mcp_tools_with_nonexistent_directory():
         output_dir=nonexistent_dir,
     )
     assert module is None
+
+
+def test_mcp_tools_with_none_parameters():
+    """Test MCP tools with None parameters to prevent AttributeError."""
+    from terraform_ingest.mcp_service import (
+        _get_module_details_impl,
+        _list_module_resources_impl,
+        _list_module_versions_impl,
+    )
+
+    # Test get_module_details with None repository
+    result = _get_module_details_impl(
+        repository=None, ref="main", path=".", output_dir="./output"
+    )
+    assert isinstance(result, dict)
+    assert "error" in result
+
+    # Test get_module_details with None ref
+    result = _get_module_details_impl(
+        repository="https://github.com/example/repo",
+        ref=None,
+        path=".",
+        output_dir="./output",
+    )
+    assert isinstance(result, dict)
+    assert "error" in result
+
+    # Test list_module_resources with None repository
+    result = _list_module_resources_impl(
+        repository=None, ref="main", path=".", output_dir="./output"
+    )
+    assert isinstance(result, list)
+    assert len(result) > 0
+    assert "error" in result[0]
+
+    # Test list_module_resources with None ref
+    result = _list_module_resources_impl(
+        repository="https://github.com/example/repo",
+        ref=None,
+        path=".",
+        output_dir="./output",
+    )
+    assert isinstance(result, list)
+    assert len(result) > 0
+    assert "error" in result[0]
+
+    # Test list_module_versions with None repository
+    result = _list_module_versions_impl(
+        repository=None, path=".", output_dir="./output"
+    )
+    assert isinstance(result, list)
+    assert len(result) > 0
+    assert "error" in result[0]
 
 
 # MCP Auto-Ingestion Tests
