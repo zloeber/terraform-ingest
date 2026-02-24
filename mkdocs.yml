@@ -15,7 +15,6 @@ nav:
   - 'CLI Docs': cli.md
   - 'CLI Config': config_command.md
   - 'Importing Repos': import.md
-  - 'GitHub Rate Limit Fix': github_rate_limit_fix.md
   - 'MCP': mcp.md
   - 'MCP Usage Examples': mcp_use_examples.md
   - 'MCP Registry Publishing': mcp_registry_publishing.md

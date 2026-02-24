@@ -651,6 +651,103 @@ def test_mcp_tools_with_none_parameters():
     assert "error" in result[0]
 
 
+def test_search_modules_with_none_provider_fields():
+    """Test search_modules handles None values in provider fields gracefully."""
+    from terraform_ingest.mcp_service import ModuleQueryService
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_dir = Path(tmpdir)
+
+        # Create a module summary with None values in provider fields
+        summary_with_none_provider = {
+            "repository": "https://github.com/example/test-module",
+            "ref": "main",
+            "path": ".",
+            "description": "Test module with None provider fields",
+            "variables": [],
+            "outputs": [],
+            "providers": [
+                {"name": "aws", "source": None},  # None source
+                {"name": None, "source": "hashicorp/azurerm"},  # None name
+                {"name": None, "source": None},  # Both None
+            ],
+            "modules": [],
+            "resources": [],
+            "readme_content": "Test module",
+        }
+
+        # Write the summary
+        summary_path = output_dir / "test_module_main_.json"
+        with open(summary_path, "w") as f:
+            json.dump(summary_with_none_provider, f)
+
+        # Test that search doesn't crash with None provider fields
+        service = ModuleQueryService(output_dir)
+
+        # Search by provider should handle None values gracefully
+        results = service.search_modules(query="test", provider="aws")
+        assert isinstance(results, list)
+        # Should find the module even though source is None
+        assert len(results) == 1
+
+        # Search by different provider
+        results = service.search_modules(query="test", provider="azurerm")
+        assert isinstance(results, list)
+        # Should find the module even though name is None
+        assert len(results) == 1
+
+        # Search without provider filter
+        results = service.search_modules(query="test")
+        assert isinstance(results, list)
+        assert len(results) == 1
+
+
+def test_list_repositories_with_none_fields():
+    """Test list_repositories handles None values in summary fields gracefully."""
+    from terraform_ingest.mcp_service import ModuleQueryService
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_dir = Path(tmpdir)
+
+        # Create summaries with None values
+        summaries_with_none = [
+            {
+                "repository": None,  # None repository
+                "ref": "main",
+                "path": ".",
+                "description": "Test module 1",
+                "variables": [],
+                "outputs": [],
+                "providers": [],
+                "modules": [],
+                "resources": [],
+            },
+            {
+                "repository": "https://github.com/example/test-module",
+                "ref": None,  # None ref
+                "path": ".",
+                "description": None,  # None description
+                "variables": [],
+                "outputs": [],
+                "providers": [],
+                "modules": [],
+                "resources": [],
+            },
+        ]
+
+        for i, summary in enumerate(summaries_with_none):
+            summary_path = output_dir / f"test_module_{i}.json"
+            with open(summary_path, "w") as f:
+                json.dump(summary, f)
+
+        # Test that list_repositories doesn't crash with None fields
+        service = ModuleQueryService(output_dir)
+        repos = service.list_repositories()
+
+        assert isinstance(repos, list)
+        # Should handle None values gracefully without crashing
+
+
 # MCP Auto-Ingestion Tests
 def test_load_config_file_success():
     """Test loading a valid configuration file."""

@@ -224,7 +224,7 @@ tasks:
   update:actions:
     desc: Update GitHub Actions in workflows
     cmds:
-      - npx actions-up -y
+      - npx actions-up -y --include-branches
   
   mcp:scan:
     desc: Scan MCP package for issues
