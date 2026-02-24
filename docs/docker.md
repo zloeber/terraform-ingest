@@ -71,7 +71,7 @@ docker-compose down
 - **[Full Guide](docker_guide.md)** - Comprehensive documentation
 - **[Quick Reference](docker_quick_ref.md)** - Common commands
 - **[Implementation Details](docker_complete.md)** - How it works
-- **[Checklist](DOCKER_CHECKLIST.md)** - Verification checklist
+- **[Architecture](docker_arch.md)** - System design
 
 ## 🎯 Features
 
@@ -204,7 +204,7 @@ docker-compose logs -f
 
 - [Docker Compose Docs](https://docs.docker.com/compose/)
 - [FastAPI Docs](https://fastapi.tiangolo.com/)
-- [terraform-ingest README](README.md)
+- [MkDocs Documentation](https://www.mkdocs.org/)
 
 ## 💡 Tips
 

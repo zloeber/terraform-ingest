@@ -112,7 +112,6 @@ After pushing first merge to main:
 
 ## Documentation Links
 
-- Full guide: [Semantic Release Pipeline](./docs/semantic_release_FEATURE.md)
-- Commit format: [Commit Conventions](./docs/commit_conventions.md)
-- All workflows: [CI/CD Pipeline](./docs/cicd_pipeline.md)
-- Implementation: [Setup Details](./SEMANTIC_RELEASE_SETUP.md)
+- CI/CD Pipeline overview: [CI/CD Pipeline](cicd_pipeline.md)
+- Version calculation is based on conventional commit prefixes: `feat:` (minor), `fix:` (patch), `feat!:` (major)
+- Automatic releases are triggered on pushes to the main branch

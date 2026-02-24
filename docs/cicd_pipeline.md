@@ -33,7 +33,7 @@ Automatically generates semantic version tags and releases:
 - ✅ Integrates with existing release workflow
 - ✅ Prevents duplicate releases
 
-**See**: [Semantic Release Documentation](./semantic_release_FEATURE.md)
+**Commit Message Format**: Use conventional commits like `feat:`, `fix:`, `feat!:` to control version bumps
 
 ### 3. Release Workflow (release.yaml)
 **Triggers:** When version tags are created (e.g., v1.2.3)
@@ -170,7 +170,7 @@ git push origin feature/my-feature
 | `feat!: redesign API` | 1.2.3 | 2.0.0 | Major |
 | `BREAKING CHANGE: ...` | 1.2.3 | 2.0.0 | Major |
 
-See [Commit Conventions](./commit_conventions.md) for detailed guide.
+Use conventional commit format (e.g., `feat:`, `fix:`, `feat!:`) to control automatic version bumps.
 
 ## Checking Workflow Status
 
@@ -234,10 +234,10 @@ uv run ruff format src/terraform_ingest
 
 ## Related Documentation
 
-- [Semantic Release Pipeline](./semantic_release_FEATURE.md)
-- [Commit Message Conventions](./commit_conventions.md)
-- [Development Setup](./development.md)
-- [Testing Guide](./testing.md)
+For more detailed information about workflows and versioning:
+- **Testing**: See the Development documentation for testing guidelines
+- **Building**: Build verification is part of the test workflow
+- **Releases**: Versions are calculated automatically using semantic versioning based on commit message conventions
 
 ## Support
 

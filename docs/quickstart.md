@@ -197,7 +197,7 @@ for summary in summaries:
 
 ## Next Steps
 
-- Read the full [README.md](README.md) for detailed documentation
-- Check out [examples/](examples/) for more usage examples
+- Check out the [Development Guide](dev.md) for more detailed information
+- View [CLI Documentation](cli.md) for command-line interface details
 - Run tests: `pytest tests/`
 - View API documentation: Start the server and visit `http://localhost:8000/docs`

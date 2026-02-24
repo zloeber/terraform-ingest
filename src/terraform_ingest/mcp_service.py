@@ -128,20 +128,20 @@ class ModuleQueryService:
         repos: Dict[str, Dict[str, Any]] = {}
 
         for summary in summaries:
-            repo_url = summary.get("repository", "")
+            repo_url = summary.get("repository") or ""
 
             if repo_url not in repos:
                 repos[repo_url] = {
                     "url": repo_url,
                     "name": self._extract_repo_name(repo_url),
-                    "description": summary.get("description", ""),
+                    "description": summary.get("description") or "",
                     "refs": [],
                     "module_count": 0,
                     "providers": set(),
                 }
 
             # Add ref information
-            ref = summary.get("ref", "")
+            ref = summary.get("ref") or ""
             if ref not in repos[repo_url]["refs"]:
                 repos[repo_url]["refs"].append(ref)
 
@@ -149,7 +149,7 @@ class ModuleQueryService:
 
             # Collect providers
             for provider in summary.get("providers", []):
-                provider_name = provider.get("name", "")
+                provider_name = provider.get("name") or ""
                 if provider_name:
                     repos[repo_url]["providers"].add(provider_name)
 
@@ -165,9 +165,9 @@ class ModuleQueryService:
             result = [
                 r
                 for r in result
-                if keyword_lower in r["name"].lower()
-                or keyword_lower in r["description"].lower()
-                or keyword_lower in r["url"].lower()
+                if keyword_lower in (r["name"] or "").lower()
+                or keyword_lower in (r["description"] or "").lower()
+                or keyword_lower in (r["url"] or "").lower()
             ]
 
         # Apply limit
@@ -212,8 +212,8 @@ class ModuleQueryService:
                 provider_match = False
 
                 for p in module_providers:
-                    p_name = p.get("name", "").lower()
-                    p_source = p.get("source", "").lower()
+                    p_name = (p.get("name") or "").lower()
+                    p_source = (p.get("source") or "").lower()
                     if provider_lower in p_name or provider_lower in p_source:
                         provider_match = True
                         break
@@ -604,12 +604,15 @@ def list_repositories(
         - module_count: Number of module versions
         - providers: List of Terraform providers used
     """
-    service = get_service(output_dir)
+    try:
+        service = get_service(output_dir)
 
-    # Cap limit at 100
-    limit = min(limit, 100)
+        # Cap limit at 100
+        limit = min(limit, 100)
 
-    return service.list_repositories(filter_keyword=filter, limit=limit)
+        return service.list_repositories(filter_keyword=filter, limit=limit)
+    except Exception as e:
+        return [{"error": str(e), "message": "Failed to list repositories"}]
 
 
 @mcp.tool()
@@ -643,18 +646,23 @@ def search_modules(
         - modules: Sub-modules used
         - readme_content: README file content
     """
-    # Validate query parameter (None check)
-    if query is None:
-        return [
-            {
-                "error": "query parameter is required",
-                "message": "Please provide a search query",
-            }
-        ]
+    try:
+        # Validate query parameter (None check)
+        if query is None:
+            return [
+                {
+                    "error": "query parameter is required",
+                    "message": "Please provide a search query",
+                }
+            ]
 
-    service = get_service(output_dir)
+        service = get_service(output_dir)
 
-    return service.search_modules(query=query, repo_urls=repo_urls, provider=provider)
+        return service.search_modules(
+            query=query, repo_urls=repo_urls, provider=provider
+        )
+    except Exception as e:
+        return [{"error": str(e), "message": "Failed to search modules"}]
 
 
 @mcp.tool()
@@ -689,15 +697,18 @@ def get_module_details(
         - readme_content: Full README file content
         Or None if the module is not found.
     """
-    # Validate required parameters
-    if repository is None or ref is None or path is None:
-        return {
-            "error": "Missing required parameters",
-            "message": "repository, ref, and path are all required",
-        }
+    try:
+        # Validate required parameters
+        if repository is None or ref is None or path is None:
+            return {
+                "error": "Missing required parameters",
+                "message": "repository, ref, and path are all required",
+            }
 
-    service = get_service(output_dir)
-    return service.get_module(repository=repository, ref=ref, path=path)
+        service = get_service(output_dir)
+        return service.get_module(repository=repository, ref=ref, path=path)
+    except Exception as e:
+        return {"error": str(e), "message": "Failed to get module details"}
 
 
 @mcp.tool()
@@ -726,10 +737,13 @@ def list_modules(
         - provider_count: Number of required providers
         - module_count: Number of sub-modules
     """
-    service = get_service(output_dir)
-    # Cap limit at 500
-    limit = min(limit, 500)
-    return service.list_modules(limit=limit)
+    try:
+        service = get_service(output_dir)
+        # Cap limit at 500
+        limit = min(limit, 500)
+        return service.list_modules(limit=limit)
+    except Exception as e:
+        return [{"error": str(e), "message": "Failed to list modules"}]
 
 
 @mcp.tool()
@@ -756,17 +770,20 @@ def list_module_resources(
         - type: Resource type (e.g., "aws_vpc", "aws_security_group")
         - name: Resource name as defined in the module
     """
-    # Validate required parameters
-    if repository is None or ref is None:
-        return [
-            {
-                "error": "Missing required parameters",
-                "message": "repository and ref are required",
-            }
-        ]
+    try:
+        # Validate required parameters
+        if repository is None or ref is None:
+            return [
+                {
+                    "error": "Missing required parameters",
+                    "message": "repository and ref are required",
+                }
+            ]
 
-    service = get_service(output_dir)
-    return service.list_module_resources(repository=repository, ref=ref, path=path)
+        service = get_service(output_dir)
+        return service.list_module_resources(repository=repository, ref=ref, path=path)
+    except Exception as e:
+        return [{"error": str(e), "message": "Failed to list module resources"}]
 
 
 @mcp.tool()
@@ -796,17 +813,20 @@ def list_module_versions(
         - outputs_count: Number of outputs
         - resources_count: Number of resources
     """
-    # Validate required parameters
-    if repository is None:
-        return [
-            {
-                "error": "Missing required parameter",
-                "message": "repository is required",
-            }
-        ]
+    try:
+        # Validate required parameters
+        if repository is None:
+            return [
+                {
+                    "error": "Missing required parameter",
+                    "message": "repository is required",
+                }
+            ]
 
-    service = get_service(output_dir)
-    return service.list_module_versions(repository=repository, path=path)
+        service = get_service(output_dir)
+        return service.list_module_versions(repository=repository, path=path)
+    except Exception as e:
+        return [{"error": str(e), "message": "Failed to list module versions"}]
 
 
 @mcp.tool()
