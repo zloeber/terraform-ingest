@@ -745,21 +745,14 @@ def test_list_repositories_with_none_fields():
         repos = service.list_repositories()
 
         assert isinstance(repos, list)
-        # No repository entry in the result should be None
-        for repo in repos:
-            assert repo is not None
-            if isinstance(repo, dict) and "repository" in repo:
-                # Repositories with a None identifier should have been filtered out
-                assert repo["repository"] is not None
-
-        # The only valid repository in the input should be present in the results
+        # Should have exactly 1 repository (the one with a valid URL)
+        assert len(repos) == 1
+        
+        # Verify the valid repository is present
         expected_repo = "https://github.com/example/test-module"
-        if repos:
-            first = repos[0]
-            if isinstance(first, dict):
-                assert first.get("repository") == expected_repo
-            else:
-                assert first == expected_repo
+        assert repos[0]["url"] == expected_repo
+        assert repos[0]["name"] is not None
+        assert repos[0]["description"] == ""  # None description becomes empty string
 
 
 # MCP Auto-Ingestion Tests
