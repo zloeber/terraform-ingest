@@ -129,7 +129,7 @@ class ModuleQueryService:
 
         for summary in summaries:
             repo_url = summary.get("repository") or ""
-            
+
             # Skip entries with no repository URL
             if not repo_url:
                 continue

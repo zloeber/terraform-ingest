@@ -747,7 +747,7 @@ def test_list_repositories_with_none_fields():
         assert isinstance(repos, list)
         # Should have exactly 1 repository (the one with a valid URL)
         assert len(repos) == 1
-        
+
         # Verify the valid repository is present
         expected_repo = "https://github.com/example/test-module"
         assert repos[0]["url"] == expected_repo
