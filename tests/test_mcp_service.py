@@ -740,12 +740,19 @@ def test_list_repositories_with_none_fields():
             with open(summary_path, "w") as f:
                 json.dump(summary, f)
 
-        # Test that list_repositories doesn't crash with None fields
+        # Test that list_repositories handles None fields and filters invalid entries
         service = ModuleQueryService(output_dir)
         repos = service.list_repositories()
 
         assert isinstance(repos, list)
-        # Should handle None values gracefully without crashing
+        # Should have exactly 1 repository (the one with a valid URL)
+        assert len(repos) == 1
+
+        # Verify the valid repository is present
+        expected_repo = "https://github.com/example/test-module"
+        assert repos[0]["url"] == expected_repo
+        assert repos[0]["name"] is not None
+        assert repos[0]["description"] == ""  # None description becomes empty string
 
 
 # MCP Auto-Ingestion Tests
