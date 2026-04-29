@@ -3,15 +3,66 @@
 from typing import List, Optional, Any, Literal, Dict
 from pydantic import BaseModel, Field
 
+_SENTINEL = object()  # Used internally to distinguish "no default" from "default=None"
+
 
 class TerraformVariable(BaseModel):
-    """Model for a Terraform variable."""
+    """Model for a Terraform variable.
+
+    Key semantics (mirrors Terraform language spec):
+    - ``required`` is ``True`` iff the ``default`` *attribute* is entirely absent
+      from the variable block.  A variable with ``default = null`` is optional.
+    - ``has_default`` makes that distinction explicit for downstream consumers
+      (MCP agents, RAG systems) that cannot distinguish a missing JSON key from
+      a JSON ``null`` value.
+    - ``nullable`` reflects the Terraform ``nullable`` argument (default ``True``).
+      When ``False`` the module will reject an explicit ``null`` from callers.
+    - ``default_semantics`` is an optional hint:
+        - ``"sentinel_null"``  – ``default = null`` is used as a sentinel so the
+          module can compute a real default inside ``locals``.
+        - ``"literal"``        – the default is a concrete, non-null value.
+    """
 
     name: str
     type: Optional[str] = None
     description: Optional[str] = None
-    default: Optional[Any] = None
+
+    # --- default tracking ---
+    has_default: bool = False
+    """True if the variable block contains a ``default`` attribute (even null)."""
+
+    default: Optional[Any] = Field(default=None)
+    """Present (possibly null) only when ``has_default`` is True.
+    Omitted entirely from serialised output when ``has_default`` is False."""
+
+    default_semantics: Optional[Literal["sentinel_null", "literal"]] = None
+    """Hint for agents: how to interpret the default value."""
+
+    # --- optionality / nullability ---
     required: bool = True
+    """True iff the variable has no ``default`` attribute."""
+
+    nullable: bool = True
+    """Reflects the Terraform ``nullable`` argument (defaults to ``True``)."""
+
+    def model_post_init(self, __context: Any) -> None:  # noqa: ANN001
+        """Ensure ``required`` and ``default_semantics`` are consistent."""
+        # required is always derived from has_default
+        object.__setattr__(self, "required", not self.has_default)
+
+    def model_dump(self, **kwargs: Any) -> Dict[str, Any]:
+        """Omit the ``default`` field entirely when there is no default."""
+        data = super().model_dump(**kwargs)
+        if not self.has_default:
+            data.pop("default", None)
+            data.pop("default_semantics", None)
+        return data
+
+    def model_dump_json(self, **kwargs: Any) -> str:
+        """JSON serialisation that omits ``default`` when there is no default."""
+        import json
+
+        return json.dumps(self.model_dump(**kwargs))
 
 
 class TerraformOutput(BaseModel):
