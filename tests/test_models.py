@@ -15,16 +15,81 @@ from terraform_ingest.models import (
 
 def test_terraform_variable():
     """Test TerraformVariable model."""
-    var = TerraformVariable(
-        name="vpc_cidr",
+    # Required variable (no default)
+    var_required = TerraformVariable(
+        name="required_var",
         type="string",
-        description="CIDR block for VPC",
-        default="10.0.0.0/16",
-        required=False,
+        description="A required variable",
+        has_default=False,
+        required=True,
+        nullable=True,
     )
-    assert var.name == "vpc_cidr"
-    assert var.type == "string"
-    assert var.required is False
+    assert var_required.required is True
+    assert var_required.has_default is False
+    assert not hasattr(var_required, "default") or var_required.default is None
+    dump = var_required.model_dump()
+    assert "default" not in dump
+
+    # Variable with default = null (sentinel)
+    var_null_default = TerraformVariable(
+        name="sentinel_null_var",
+        type="any",
+        description="A variable with null default",
+        has_default=True,
+        default=None,
+        default_semantics="sentinel_null",
+        required=False,
+        nullable=True,
+    )
+    assert var_null_default.required is False
+    assert var_null_default.has_default is True
+    assert var_null_default.default is None
+    assert var_null_default.default_semantics == "sentinel_null"
+    dump = var_null_default.model_dump()
+    assert "default" in dump and dump["default"] is None
+    assert dump["default_semantics"] == "sentinel_null"
+
+    # Variable with literal default
+    var_literal = TerraformVariable(
+        name="literal_var",
+        type="number",
+        description="A variable with a literal default",
+        has_default=True,
+        default=42,
+        default_semantics="literal",
+        required=False,
+        nullable=True,
+    )
+    assert var_literal.required is False
+    assert var_literal.default == 42
+    assert var_literal.default_semantics == "literal"
+    dump = var_literal.model_dump()
+    assert dump["default"] == 42
+    assert dump["default_semantics"] == "literal"
+
+    # Variable with nullable = False
+    var_not_nullable = TerraformVariable(
+        name="not_nullable_var",
+        type="string",
+        description="A not-nullable variable",
+        has_default=True,
+        default="foo",
+        default_semantics="literal",
+        required=False,
+        nullable=False,
+    )
+    assert var_not_nullable.nullable is False
+
+    # Test omitted default in serialization
+    var_no_default = TerraformVariable(
+        name="no_default_var",
+        type="string",
+        description="No default",
+        has_default=False,
+        required=True,
+    )
+    dump2 = var_no_default.model_dump()
+    assert "default" not in dump2 and "default_semantics" not in dump2
 
 
 def test_terraform_output():

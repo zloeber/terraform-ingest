@@ -57,7 +57,13 @@ class TerraformParser:
         )
 
     def _parse_variables(self) -> List[TerraformVariable]:
-        """Parse variables from variables.tf files."""
+        """Parse variables from variables.tf files.
+
+        Correctly distinguishes between:
+        - No ``default`` attribute  → required=True,  has_default=False
+        - ``default = null``        → required=False, has_default=True, default_semantics="sentinel_null"
+        - ``default = <literal>``   → required=False, has_default=True, default_semantics="literal"
+        """
         variables = []
         var_files = list(self.module_path.glob("variables.tf")) + list(
             self.module_path.glob("vars.tf")
@@ -72,29 +78,59 @@ class TerraformParser:
                     if "variable" in parsed:
                         for var_list in parsed["variable"]:
                             for var_name, var_config in var_list.items():
+                                # --- type ---
                                 var_type = var_config.get("type")
                                 if isinstance(var_type, list) and len(var_type) > 0:
                                     var_type = str(var_type[0])
                                 elif var_type:
                                     var_type = str(var_type)
 
-                                default = var_config.get("default")
-                                if default and isinstance(default, list):
-                                    default = default[0] if len(default) > 0 else None
-
+                                # --- description ---
                                 description = var_config.get("description")
                                 if description and isinstance(description, list):
                                     description = (
                                         description[0] if len(description) > 0 else None
                                     )
 
+                                # --- nullable ---
+                                nullable_raw = var_config.get("nullable", True)
+                                if isinstance(nullable_raw, list):
+                                    nullable_raw = (
+                                        nullable_raw[0] if nullable_raw else True
+                                    )
+                                nullable = bool(nullable_raw)
+
+                                # --- default presence vs. value ---
+                                # hcl2 omits the key entirely when there is no default attribute,
+                                # so "default" in var_config is the reliable presence check.
+                                has_default = "default" in var_config
+
+                                default_value: Any = None
+                                default_semantics = None
+
+                                if has_default:
+                                    raw = var_config["default"]
+                                    # hcl2 wraps scalar defaults in a list
+                                    if isinstance(raw, list):
+                                        default_value = raw[0] if len(raw) > 0 else None
+                                    else:
+                                        default_value = raw
+
+                                    if default_value is None:
+                                        default_semantics = "sentinel_null"
+                                    else:
+                                        default_semantics = "literal"
+
                                 variables.append(
                                     TerraformVariable(
                                         name=var_name,
                                         type=var_type,
                                         description=description,
-                                        default=default,
-                                        required=default is None,
+                                        has_default=has_default,
+                                        default=default_value if has_default else None,
+                                        default_semantics=default_semantics,
+                                        required=not has_default,
+                                        nullable=nullable,
                                     )
                                 )
             except Exception as e:

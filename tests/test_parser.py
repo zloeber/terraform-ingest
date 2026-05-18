@@ -13,39 +13,77 @@ def test_parser_initialization():
 
 
 def test_parse_variables():
-    """Test parsing variables from variables.tf."""
+    """Test parsing variables from variables.tf with various default/nullable scenarios."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a sample variables.tf
         variables_tf = Path.joinpath(Path(tmpdir), "variables.tf")
         variables_tf.write_text(
             """
-variable "vpc_cidr" {
-  description = "CIDR block for VPC"
+variable "required_var" {
+  description = "Required; no default or nullable."
   type        = string
-  default     = "10.0.0.0/16"
 }
 
-variable "enable_dns" {
-  description = "Enable DNS support"
-  type        = bool
+variable "sentinel_null_var" {
+  description = "Default is null; sentinel."
+  type        = any
+  default     = null
 }
-"""
+
+variable "literal_var" {
+  description = "Default is a literal."
+  type        = number
+  default     = 42
+}
+
+variable "not_nullable_var" {
+  description = "Not nullable, but has default."
+  type        = string
+  default     = "foo"
+  nullable    = false
+}
+            """
         )
 
         parser = TerraformParser(tmpdir)
         variables = parser._parse_variables()
+        assert len(variables) == 4
+        by_name = {v.name: v for v in variables}
 
-        assert len(variables) == 2
-        assert variables[0].name == "vpc_cidr"
-        assert variables[0].default == "10.0.0.0/16"
-        assert variables[1].name == "enable_dns"
-        assert variables[1].required is True
+        # required_var
+        v_req = by_name["required_var"]
+        assert v_req.required is True
+        assert v_req.has_default is False
+        assert v_req.nullable is True
+        assert not hasattr(v_req, "default") or v_req.default is None
+
+        # sentinel_null_var
+        v_null = by_name["sentinel_null_var"]
+        assert v_null.has_default is True
+        assert v_null.required is False
+        assert v_null.default is None
+        assert v_null.default_semantics == "sentinel_null"
+        assert v_null.nullable is True
+
+        # literal_var
+        v_lit = by_name["literal_var"]
+        assert v_lit.default == 42
+        assert v_lit.has_default is True
+        assert v_lit.required is False
+        assert v_lit.default_semantics == "literal"
+        assert v_lit.nullable is True
+
+        # not_nullable_var
+        v_notnull = by_name["not_nullable_var"]
+        assert v_notnull.default == "foo"
+        assert v_notnull.has_default is True
+        assert v_notnull.nullable is False
+        assert v_notnull.required is False
+        assert v_notnull.default_semantics == "literal"
 
 
 def test_parse_outputs():
     """Test parsing outputs from outputs.tf."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a sample outputs.tf
         outputs_tf = Path.joinpath(Path(tmpdir), "outputs.tf")
         outputs_tf.write_text(
             """
@@ -72,7 +110,6 @@ output "vpc_arn" {
 def test_parse_providers():
     """Test parsing providers from terraform files."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a sample main.tf with provider requirements
         main_tf = Path(tmpdir) / "main.tf"
         main_tf.write_text(
             """
@@ -99,14 +136,12 @@ terraform {
 def test_parse_modules():
     """Test parsing module references."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a sample main.tf with module references
         main_tf = Path(tmpdir) / "main.tf"
         main_tf.write_text(
             """
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "3.0.0"
-  
   name = "my-vpc"
 }
 """
@@ -124,7 +159,6 @@ module "vpc" {
 def test_read_readme():
     """Test reading README file."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a sample README
         readme = Path(tmpdir) / "README.md"
         readme.write_text("# Test Module\n\nThis is a test module.")
 
@@ -138,7 +172,6 @@ def test_read_readme():
 def test_extract_description():
     """Test extracting description from README."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a sample README
         readme = Path(tmpdir) / "README.md"
         readme.write_text("# Test Module\n\nThis module creates AWS VPC resources.")
 
@@ -152,7 +185,6 @@ def test_extract_description():
 def test_parse_module_complete():
     """Test complete module parsing."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create sample terraform files
         (Path(tmpdir) / "main.tf").write_text(
             """
 terraform {
@@ -197,7 +229,6 @@ output "id" {
 def test_parse_resources():
     """Test parsing resources from Terraform files."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a sample main.tf with resources
         main_tf = Path.joinpath(Path(tmpdir), "main.tf")
         main_tf.write_text(
             """
@@ -231,7 +262,6 @@ resource "aws_subnet" "private" {
 def test_parse_module_includes_resources():
     """Test that parse_module includes resources in the summary."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create sample files
         (Path(tmpdir) / "main.tf").write_text(
             """
 resource "aws_security_group" "allow_ssh" {

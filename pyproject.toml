@@ -5,7 +5,7 @@ requires-python = ">=3.12"
 dependencies = [
     "click>=8.3.0",
     "fastapi>=0.119.0",
-    "fastmcp>=0.5.0",
+    "fastmcp>=2.13.0.2",
     "gitpython>=3.1.45",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
@@ -13,6 +13,7 @@ dependencies = [
     "pydantic>=2.12.2",
     "python-hcl2>=7.3.1",
     "pyyaml>=6.0.3",
+    "requests>=2.31.0",
     "urllib3>=2.5.0",
     "uvicorn>=0.37.0",
 ]
