@@ -912,6 +912,28 @@ def mcp(config, transport, host, port, ingest_on_startup):
         os.environ["TERRAFORM_INGEST_CONFIG"] = config
 
     try:
+        # Attempt to install embedding dependencies before MCP starts.
+        # This keeps MCP startup resilient when embeddings are enabled.
+        try:
+            with open(config, "r", encoding="utf-8") as config_handle:
+                config_dict = yaml.safe_load(config_handle)
+            ingest_config = IngestConfig(**config_dict) if config_dict else None
+            if ingest_config and ingest_config.embedding:
+                from terraform_ingest.dependency_installer import (
+                    ensure_embeddings_available,
+                )
+
+                ensure_embeddings_available(
+                    ingest_config.embedding,
+                    logger=logger,
+                    auto_install=True,
+                )
+        except Exception as e:
+            logger.warning(
+                f"Unable to pre-install embedding dependencies: {e}. "
+                "Continuing MCP startup."
+            )
+
         mcp_main(
             config_file=config,
             transport=transport,
