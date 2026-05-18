@@ -28,13 +28,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: setup.py
+          cache-dependency-path: |
+            pyproject.toml
+            uv.lock
 
       - name: Set up environment
         run: |
           pip install uv
-          uv venv
-          uv pip install -e ".[test]"
+          uv sync --extra test
 
       - name: Unit Tests
         run: |
@@ -46,6 +47,4 @@ jobs:
           uv run black --check ${{ env.PROJECT_PATH }}
           uv run ruff format --check ${{ env.PROJECT_PATH }}
       - name: Build Check
-        run: |
-          uv sync
-          uv build
+        run: uv build
