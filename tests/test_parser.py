@@ -2,9 +2,7 @@
 
 import tempfile
 from pathlib import Path
-import pytest
 from terraform_ingest.parser import TerraformParser
-from terraform_ingest.models import TerraformVariable
 
 
 def test_parser_initialization():
