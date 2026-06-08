@@ -332,26 +332,29 @@ terraform-ingest ingest config.yaml  # Updates existing entries
 
 The embedding text is constructed from:
 
-1. **Module Description**: From README or HCL comments
-2. **README Content**: First 2000 characters
-3. **Variable Definitions**: Names, descriptions, and types
-4. **Output Definitions**: Names and descriptions
-5. **Resource Types**: Provider names and module sources
+1. **Module Name**: Repository name and submodule path (always included). For example, `aws-argocd-github-repo` with a submodule at `modules/argocd` produces `Module: aws-argocd-github-repo argocd`. This provides a strong, noise-free signal for searches by module or service name.
+2. **Module Description**: Extracted from the README or HCL file comments. Badge lines (`![CI](...)`, `[![CI](...)](url)`), HTML comments (`<!-- BEGIN_TF_DOCS -->`, `<!-- markdownlint-disable -->`), and other markup scaffolding are skipped to find the first real prose paragraph.
+3. **README Content**: First 2000 characters. Note: the `chromadb-default` embedding model (`all-MiniLM-L6-v2`) has an effective limit of ~256 tokens (~1000 characters), so content beyond that is not used when running with the default strategy. Increasing the README content limit only improves results when using a higher-capacity model such as `openai` or `sentence-transformers`.
+4. **Variable Definitions**: Names, descriptions, and types
+5. **Output Definitions**: Names and descriptions
+6. **Resource Types**: Provider names and module sources
 
 Example embedded text:
 ```
-Description: Terraform module to create VPC resources on AWS
+Module: aws-argocd-github-repo argocd
 
-README: # AWS VPC Terraform module
-This module creates a VPC with public and private subnets...
+Description: This module configures a GitHub repository for use with ArgoCD for GitOps-based deployments.
 
-Variables: vpc_cidr: CIDR block for VPC (type: string), 
-enable_nat_gateway: Enable NAT Gateway (type: bool)...
+README: # aws-argocd-github-repo
+This module configures a GitHub repository for use with ArgoCD...
 
-Outputs: vpc_id: ID of the VPC, 
-private_subnet_ids: List of private subnet IDs...
+Variables: repo_name: Name of the GitHub repository (type: string),
+branch: Default branch name (type: string)...
 
-Resources: aws provider, module: terraform-aws-modules/subnets/aws
+Outputs: repo_url: URL of the GitHub repository,
+webhook_secret: ArgoCD webhook secret...
+
+Resources: github provider
 ```
 
 ## Installation
