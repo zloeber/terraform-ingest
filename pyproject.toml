@@ -14,6 +14,7 @@ dependencies = [
     "python-hcl2>=7.3.1",
     "pyyaml>=6.0.3",
     "requests>=2.31.0",
+    "types-pyyaml>=6.0.12.20260518",
     "urllib3>=2.5.0",
     "uvicorn>=0.37.0",
 ]
@@ -36,6 +37,8 @@ dev = [
     "mypy>=1.18.2",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
+    "bandit",
+    "pip-audit",
 ]
 
 [tool.hatch.version]
@@ -55,6 +58,12 @@ terraform-ingest-mcp = "terraform_ingest.mcp_service:main"
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel.force-include]
+"skills" = "terraform_ingest/data/skills"
+
+[tool.hatch.build.targets.sdist.force-include]
+"skills" = "skills"
 
 [project.optional-dependencies]
 standard = []

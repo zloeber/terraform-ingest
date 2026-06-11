@@ -214,9 +214,13 @@ This project uses uv + hatch + hatch-vcs for building and automatic versioning. 
 
 # Pull Request Preparation
 
-Before submitting a pull request run the following and clean any errors that come up:
+Before submitting a pull request run the quality gates and clean any errors:
 
 ```bash
-task test format lint:fix
+task qa:quick              # during development
+task qa:prepush            # before push (full gate)
+task qa:prepush:loop -- 3  # optional retry after auto-fix
 ```
+
+Agents should read `.terraform-ingest/summary.json` for results — not log files. See [QA Pre-Push Gate](./qa_prepush.md).
 

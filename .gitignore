@@ -39,6 +39,7 @@ htmlcov/
 .tox/
 
 # Terraform Ingest specific
+.terraform-ingest/
 repos/
 output/
 
@@ -57,3 +58,38 @@ site/
 config.client.yaml
 .chromadb_data/
 .ruff_cache/
+
+# Repo scaffold (scaffold-repo)
+# Secrets / env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials
+# mise
+.mise.local.toml
+# Code intelligence — local index only
+.gitnexus
+# macOS
+.AppleDouble
+.LSOverride
+._*
+# IDE / editors
+.vscode/
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl
+plan.out
+# Node
+node_modules/
+*.js.map
+npm-debug.log*
+# Python (uv)
+.venv/
+# Docs (mkdocs)
+public/
+docs/api/
+docs/superpowers

@@ -9,6 +9,8 @@ nav:
   - 'Home': index.md
   - 'Quickstart': quickstart.md
   - 'Development': dev.md
+  - 'QA Pre-Push Gate': qa_prepush.md
+  - 'QA Gate Replication Prompt': qa_prepush_replication_prompt.md
   - 'Vector Database': vectordb.md
   - 'Vector Embeddings': embeddings.md
   - 'Ingestion Indexing': module_indexing.md
@@ -16,7 +18,9 @@ nav:
   - 'CLI Config': config_command.md
   - 'Importing Repos': import.md
   - 'MCP': mcp.md
+  - 'MCP Ingestion Progress': mcp_ingestion_progress.md
   - 'MCP Usage Examples': mcp_use_examples.md
+  - 'Agent Skills': agent_skills.md
   - 'MCP Registry Publishing': mcp_registry_publishing.md
   - 'Docker': docker.md
   - 'Docker Architecture': docker_arch.md

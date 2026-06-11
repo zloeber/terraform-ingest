@@ -2,6 +2,7 @@
 _.source = '.envrc'
 
 [settings]
+experimental = true
 python.uv_venv_auto = true
 
 [tools]
@@ -14,4 +15,5 @@ yamllint = "1.37.1"
 terraform = "latest"
 node = "latest"
 ruff = "latest"
+npm = "latest"
 

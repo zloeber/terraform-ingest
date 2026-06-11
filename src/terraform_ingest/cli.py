@@ -3,7 +3,6 @@
 import os
 import click
 import json
-import shutil
 import yaml
 
 from pathlib import Path
@@ -20,6 +19,7 @@ from terraform_ingest.importers import (
     update_config_file,
 )
 from terraform_ingest.dependency_installer import DependencyInstaller
+from terraform_ingest.skills_cli import skills
 
 # from terraform_ingest.logging import get_logger
 
@@ -184,16 +184,31 @@ def ingest(
             )
             ingester.vector_db = VectorDBManager(ingester.config.embedding)
 
-        if no_cache:
-            shutil.rmtree(ingester.output_dir, ignore_errors=True)
-            shutil.rmtree(ingester.repo_manager.clone_dir, ignore_errors=True)
+        from terraform_ingest.ingestion_runner import (
+            IngestionRunOptions,
+            execute_ingestion,
+        )
 
-        ingester.output_dir.mkdir(parents=True, exist_ok=True)
-        ingester.repo_manager.clone_dir.mkdir(parents=True, exist_ok=True)
+        run_options = IngestionRunOptions(
+            auto_install_deps=auto_install_deps,
+            skip_existing=skip_existing,
+            cleanup=cleanup,
+            no_cache=no_cache,
+            notify_progress=True,
+            output_dir=output_dir,
+            clone_dir=clone_dir,
+        )
 
         click.echo("Starting ingestion...")
-        summaries = ingester.ingest()
+        result = execute_ingestion(ingester, run_options)
 
+        if not result.success:
+            click.echo(
+                f"Error during ingestion: {result.error or result.message}", err=True
+            )
+            raise click.Abort()
+
+        summaries = result.summaries
         click.echo("\nIngestion complete!")
         click.echo(f"Processed {len(summaries)} module(s)")
         click.echo(f"Summaries saved to {ingester.output_dir}")
@@ -207,12 +222,100 @@ def ingest(
                 click.echo(f"  Documents: {stats.get('document_count')}")
                 click.echo(f"  Strategy: {stats.get('embedding_strategy')}")
 
-        if cleanup:
-            click.echo("Cleaning up cloned repositories...")
-            ingester.cleanup()
-
     except Exception as e:
         click.echo(f"Error during ingestion: {e}", err=True)
+        raise click.Abort()
+
+
+@cli.group()
+def ingestion():
+    """Inspect and trigger ingestion jobs."""
+    pass
+
+
+@ingestion.command("status")
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["json", "text"]),
+    default="json",
+    help="Output format",
+)
+def ingestion_status(format):
+    """Show current ingestion progress.
+
+    Mirrors the MCP ``get_ingestion_status`` tool and ``GET /ingestion/status`` API.
+    """
+    from terraform_ingest.ingestion_runner import get_ingestion_status
+
+    status = get_ingestion_status()
+    if format == "json":
+        click.echo(json.dumps(status, indent=2))
+    else:
+        click.echo(f"Status: {status.get('status')}")
+        click.echo(f"Phase: {status.get('phase')}")
+        click.echo(f"Message: {status.get('message')}")
+        click.echo(
+            f"Progress: {status.get('current', 0)}/{status.get('total', 0)} repositories"
+        )
+        click.echo(f"Modules processed: {status.get('modules_processed', 0)}")
+
+
+@ingestion.command("run")
+@click.option(
+    "--config",
+    "-c",
+    default=None,
+    help="YAML configuration file (default: TERRAFORM_INGEST_CONFIG or config.yaml)",
+)
+@click.option(
+    "--background/--no-background",
+    default=False,
+    help="Return immediately and run ingestion in the background",
+)
+@click.option(
+    "--cleanup", is_flag=True, help="Remove cloned repositories after ingestion"
+)
+@click.option(
+    "--skip-existing",
+    is_flag=True,
+    help="Skip git fetch when repositories already exist locally",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help="Delete output and clone directories before ingestion",
+)
+def ingestion_run(config, background, cleanup, skip_existing, no_cache):
+    """Trigger ingestion from a YAML configuration file.
+
+    Mirrors the MCP ``run_ingestion`` tool and ``POST /ingest/background`` API.
+    """
+    from terraform_ingest.ingestion_runner import (
+        IngestionRunOptions,
+        resolve_config_file,
+        run_ingestion_from_yaml,
+        schedule_background_ingestion_thread,
+    )
+
+    config_file = resolve_config_file(config)
+    options = IngestionRunOptions(
+        cleanup=cleanup,
+        skip_existing=skip_existing,
+        no_cache=no_cache,
+        notify_progress=True,
+    )
+
+    if background:
+        result = schedule_background_ingestion_thread(config_file, options)
+        click.echo(json.dumps(result.to_dict(), indent=2, default=str))
+        if not result.success:
+            raise click.Abort()
+        return
+
+    result = run_ingestion_from_yaml(config_file, options)
+    click.echo(json.dumps(result.to_dict(), indent=2, default=str))
+    if not result.success:
         raise click.Abort()
 
 
@@ -1155,7 +1258,11 @@ def exec(function_name, arg, output_dir, format):
             args_dict[key] = value
 
         # Add output_dir to arguments if not already present
-        if "output_dir" not in args_dict and function_name != "search_modules_vector":
+        if "output_dir" not in args_dict and function_name not in (
+            "search_modules_vector",
+            "get_ingestion_status",
+            "run_ingestion",
+        ):
             args_dict["output_dir"] = output_dir
 
         # click.echo(f"Executing function: {function_name}")
@@ -1165,7 +1272,25 @@ def exec(function_name, arg, output_dir, format):
         from terraform_ingest.mcp_service import ModuleQueryService, MCPContext
 
         # Map function names to methods
-        if function_name == "search_modules_vector":
+        if function_name == "get_ingestion_status":
+            from terraform_ingest.ingestion_runner import get_ingestion_status
+
+            result = get_ingestion_status()
+        elif function_name == "run_ingestion":
+            from terraform_ingest.mcp_service import _run_ingestion_impl
+
+            result = _run_ingestion_impl(
+                config_file=args_dict.get("config_file"),
+                background=args_dict.get("background", "true").lower()
+                in ("true", "1", "yes"),
+                cleanup=args_dict.get("cleanup", "false").lower()
+                in ("true", "1", "yes"),
+                skip_existing=args_dict.get("skip_existing", "false").lower()
+                in ("true", "1", "yes"),
+                no_cache=args_dict.get("no_cache", "false").lower()
+                in ("true", "1", "yes"),
+            )
+        elif function_name == "search_modules_vector":
             # This function needs the MCPContext for vector DB access
             ctx = MCPContext.get_instance()
             if not ctx.ingester or not ctx.ingester.vector_db:
@@ -2188,6 +2313,9 @@ def _convert_value(value: str):
 
     # Return as string
     return value
+
+
+cli.add_command(skills)
 
 
 def main():

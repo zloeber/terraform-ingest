@@ -24,6 +24,15 @@ def test_health_endpoint():
     assert data["status"] == "healthy"
 
 
+def test_ingestion_status_endpoint():
+    """Test ingestion progress endpoint."""
+    response = client.get("/ingestion/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert "progress" in data
+    assert "status" in data["progress"]
+
+
 def test_analyze_endpoint_validation():
     """Test analyze endpoint with invalid data."""
     response = client.post("/analyze", json={})

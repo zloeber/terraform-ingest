@@ -9,6 +9,7 @@ import git
 from packaging.version import parse as parse_version, InvalidVersion
 from terraform_ingest.models import RepositoryConfig, TerraformModuleSummary
 from terraform_ingest.parser import TerraformParser
+from terraform_ingest.ingestion_progress import IngestionPhase, IngestionProgressTracker
 from terraform_ingest.tty_logger import get_logger
 
 
@@ -34,7 +35,9 @@ class RepositoryManager:
         self.skip_existing = skip_existing
 
     def process_repository(
-        self, repo_config: RepositoryConfig
+        self,
+        repo_config: RepositoryConfig,
+        progress: Optional[IngestionProgressTracker] = None,
     ) -> List[TerraformModuleSummary]:
         """Process a repository and return summaries for all refs.
 
@@ -60,10 +63,20 @@ class RepositoryManager:
         repo_path = Path.joinpath(self.clone_dir, repo_name)
 
         # Clone or update repository
+        if progress:
+            progress.update(
+                IngestionPhase.CLONING,
+                f"Cloning or updating repository: {repo_config.url}",
+            )
         repo = self._clone_or_update(repo_config.url, repo_path)
 
         # Process branches
         for branch in repo_config.branches:
+            if progress:
+                progress.update(
+                    IngestionPhase.PARSING,
+                    f"Parsing branch {branch} in {repo_name}",
+                )
             try:
                 branch_summaries = self._process_ref(
                     repo,
@@ -80,6 +93,11 @@ class RepositoryManager:
         if repo_config.include_tags:
             tags = self._get_tags(repo, repo_config.max_tags)
             for tag in tags:
+                if progress:
+                    progress.update(
+                        IngestionPhase.PARSING,
+                        f"Parsing tag {tag} in {repo_name}",
+                    )
                 try:
                     tag_summaries = self._process_ref(
                         repo,

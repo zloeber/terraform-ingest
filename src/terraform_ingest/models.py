@@ -135,6 +135,8 @@ class McpConfig(BaseModel):
     auto_ingest: bool = False
     ingest_on_startup: bool = False
     refresh_interval_hours: Optional[int] = None
+    blocking_ingest_on_startup: bool = False
+    notify_ingestion_progress: bool = True
 
     # Transport configuration
     transport: Literal["stdio", "streamable-http", "sse"] = "stdio"
