@@ -197,7 +197,8 @@ def pytest_targets(changed: set[str] | None) -> list[str]:
         return []
     targets: set[str] = set()
     unmapped_src = False
-    for path in changed:
+    for raw_path in changed:
+        path = Path(raw_path).as_posix()
         if path.startswith("tests/") and path.endswith(".py"):
             targets.add(path)
             continue
@@ -206,7 +207,7 @@ def pytest_targets(changed: set[str] | None) -> list[str]:
         module = Path(path).name.removesuffix(".py")
         candidate = Path("tests") / f"test_{module}.py"
         if candidate.is_file():
-            targets.add(str(candidate))
+            targets.add(candidate.as_posix())
         else:
             unmapped_src = True
     if unmapped_src:
