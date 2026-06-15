@@ -10,6 +10,15 @@ from fastmcp import FastMCP
 
 from terraform_ingest.models import IngestConfig
 from terraform_ingest.ingest import TerraformIngest
+from terraform_ingest.mcp_ingestion import (
+    IngestionNotificationMiddleware,
+    McpStartupSettings,
+    get_ingestion_status_dict,
+    mcp_lifespan,
+    run_blocking_startup_ingestion,
+    set_startup_settings,
+    trigger_ingestion,
+)
 from terraform_ingest.tty_logger import setup_tty_logger
 
 logger = setup_tty_logger()
@@ -19,7 +28,9 @@ logger = setup_tty_logger()
 mcp = FastMCP(
     name="terraform-ingest",
     instructions="Service for querying ingested Terraform modules from Git repositories.",
+    lifespan=mcp_lifespan,
 )
+mcp.add_middleware(IngestionNotificationMiddleware())
 
 
 class MCPContext:
@@ -583,6 +594,60 @@ def get_service(output_dir: str = "./output") -> ModuleQueryService:
     if _service is None:
         _service = ModuleQueryService(output_dir)
     return _service
+
+
+@mcp.tool()
+def get_ingestion_status() -> Dict[str, Any]:
+    """Return the current background ingestion status and recent progress messages.
+
+    Use this while the MCP server is performing startup or scheduled ingestion.
+    The ingestion://status resource exposes the same data for polling clients.
+    """
+    return get_ingestion_status_dict()
+
+
+@mcp.resource("ingestion://status")
+def ingestion_status_resource() -> str:
+    """Live ingestion progress for startup and scheduled refresh operations."""
+    return json.dumps(get_ingestion_status_dict(), indent=2)
+
+
+@mcp.tool()
+def run_ingestion(
+    config_file: Optional[str] = None,
+    background: bool = True,
+    cleanup: bool = False,
+    skip_existing: bool = False,
+    no_cache: bool = False,
+) -> Dict[str, Any]:
+    """Run repository ingestion using the server's YAML configuration.
+
+    Mirrors ``terraform-ingest ingest`` and the API ingestion endpoints. By default
+    ingestion runs in the background so the MCP server remains responsive. Poll
+    ``get_ingestion_status`` or read ``ingestion://status`` for progress.
+
+    Args:
+        config_file: Path to YAML config (default: TERRAFORM_INGEST_CONFIG or config.yaml)
+        background: Run asynchronously when True (default), synchronously when False
+        cleanup: Remove cloned repositories after ingestion completes
+        skip_existing: Skip git fetch when repositories already exist locally
+        no_cache: Delete output and clone directories before ingestion
+    """
+    try:
+        return trigger_ingestion(
+            config_file,
+            background=background,
+            cleanup=cleanup,
+            skip_existing=skip_existing,
+            no_cache=no_cache,
+        )
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Failed to start ingestion: {e}",
+            "error": str(e),
+            "progress": get_ingestion_status_dict(),
+        }
 
 
 @mcp.tool()
@@ -1462,6 +1527,23 @@ def _list_repositories_impl(
     return service.list_repositories(filter_keyword=filter, limit=limit)
 
 
+def _run_ingestion_impl(
+    config_file: Optional[str] = None,
+    background: bool = False,
+    cleanup: bool = False,
+    skip_existing: bool = False,
+    no_cache: bool = False,
+) -> Dict[str, Any]:
+    """Implementation of run_ingestion for testing."""
+    return trigger_ingestion(
+        config_file,
+        background=background,
+        cleanup=cleanup,
+        skip_existing=skip_existing,
+        no_cache=no_cache,
+    )
+
+
 def _search_modules_impl(
     query: str,
     repo_urls: Optional[List[str]] = None,
@@ -1610,13 +1692,50 @@ def _update_mcp_instructions(config: Optional[IngestConfig]):
 
 def _run_ingestion(config_file: str = "config.yaml"):
     """Run ingestion process from configuration file."""
-    try:
-        logger.info(f"Starting auto-ingestion from {config_file}...")
-        ingester = TerraformIngest.from_yaml(config_file, logger=logger)
-        summaries = ingester.ingest()
-        logger.info(f"Auto-ingestion completed: {len(summaries)} modules processed")
-    except Exception as e:
-        logger.error(f"Error during auto-ingestion: {e}")
+    from terraform_ingest.ingestion_runner import run_ingestion_from_yaml
+
+    run_ingestion_from_yaml(config_file)
+
+
+def _build_startup_settings(
+    config_file: str,
+    config: Optional[IngestConfig],
+    ingest_on_startup: bool,
+) -> McpStartupSettings:
+    """Create MCP startup settings from config and CLI overrides."""
+    mcp_config = config.mcp if config and config.mcp else None
+    return McpStartupSettings(
+        config_file=config_file,
+        ingest_config=config,
+        ingest_on_startup=ingest_on_startup,
+        blocking_ingest_on_startup=(
+            mcp_config.blocking_ingest_on_startup if mcp_config else False
+        ),
+        notify_ingestion_progress=(
+            mcp_config.notify_ingestion_progress if mcp_config else True
+        ),
+    )
+
+
+def _configure_mcp_startup(
+    config_file: str,
+    config: Optional[IngestConfig],
+    ingest_on_startup: bool,
+) -> McpStartupSettings:
+    """Configure startup ingestion behavior before launching the MCP server."""
+    settings = _build_startup_settings(config_file, config, ingest_on_startup)
+    set_startup_settings(settings)
+
+    if settings.ingest_on_startup and settings.blocking_ingest_on_startup:
+        logger.info("Running blocking ingestion before MCP server starts...")
+        run_blocking_startup_ingestion(settings)
+    elif settings.ingest_on_startup:
+        logger.info(
+            "Startup ingestion scheduled in background; "
+            "use get_ingestion_status or ingestion://status for progress"
+        )
+
+    return settings
 
 
 def _start_periodic_ingestion(config: IngestConfig, config_file: str):
@@ -1693,10 +1812,7 @@ def start(
         else (mcp_config.ingest_on_startup if mcp_config else False)
     )
 
-    # Run ingestion on startup if enabled
-    if should_ingest_on_startup:
-        logger.info("Running ingestion on startup...")
-        _run_ingestion(config_file)
+    _configure_mcp_startup(config_file, config, should_ingest_on_startup)
 
     # Start periodic ingestion if configured
     if mcp_config and mcp_config.auto_ingest and mcp_config.refresh_interval_hours:
@@ -1747,10 +1863,11 @@ def main():
     bind_port = mcp_config.port if mcp_config else 3000
 
     if mcp_config:
-        # Run ingestion on startup if enabled
-        if mcp_config.ingest_on_startup:
-            logger.info("MCP auto-ingestion enabled, running initial ingestion...")
-            _run_ingestion(config_file)
+        _configure_mcp_startup(
+            config_file,
+            config,
+            mcp_config.ingest_on_startup,
+        )
 
         # Start periodic ingestion if configured
         if mcp_config.auto_ingest and mcp_config.refresh_interval_hours:

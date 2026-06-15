@@ -9,6 +9,8 @@ The terraform-ingest MCP service exposes ingested Terraform module data to AI ag
 1. **list_repositories**: Discover available Terraform repositories
 2. **search_modules**: Find specific modules by criteria
 3. **search_modules_vector**: Search for appropriate modules using vector similarity
+4. **run_ingestion**: Trigger repository ingestion from YAML config
+5. **get_ingestion_status**: Poll background ingestion progress
 
 ## Prerequisites
 
@@ -23,6 +25,44 @@ The terraform-ingest MCP service exposes ingested Terraform module data to AI ag
    ```
 
    This creates JSON files in the output directory (default: `./output`)
+
+## Ingestion Progress Notifications
+
+When `mcp.ingest_on_startup` is enabled, the server now starts immediately and runs
+ingestion in the background by default. Connected MCP clients receive log
+notifications (`notifications/message`) as repositories are cloned, parsed,
+saved, and embedded.
+
+Poll progress at any time with:
+
+- **Tool:** `get_ingestion_status`
+- **Resource:** `ingestion://status`
+
+Example status payload:
+
+```json
+{
+  "status": "starting",
+  "phase": "cloning",
+  "message": "Processing repository 1/3: git@example.com/modules.git",
+  "current": 1,
+  "total": 3,
+  "modules_processed": 12,
+  "recent_messages": ["Starting ingestion of 3 repositories", "..."]
+}
+```
+
+### Configuration
+
+```yaml
+mcp:
+  ingest_on_startup: true
+  notify_ingestion_progress: true   # push MCP log notifications (default: true)
+  blocking_ingest_on_startup: false # wait for ingest before accepting clients (default: false)
+```
+
+Set `blocking_ingest_on_startup: true` to preserve the previous behavior where the
+server blocks until the initial ingestion completes.
 
 ## Starting the MCP Server
 

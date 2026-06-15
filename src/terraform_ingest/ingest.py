@@ -9,6 +9,7 @@ from terraform_ingest.models import IngestConfig, TerraformModuleSummary
 from terraform_ingest.repository import RepositoryManager
 from terraform_ingest.embeddings import VectorDBManager
 from terraform_ingest.indexer import ModuleIndexer
+from terraform_ingest.ingestion_progress import IngestionPhase, IngestionProgressTracker
 from terraform_ingest.tty_logger import get_logger
 from terraform_ingest.dependency_installer import ensure_embeddings_available
 
@@ -91,8 +92,13 @@ class TerraformIngest:
             skip_existing=skip_existing,
         )
 
-    def ingest(self) -> List[TerraformModuleSummary]:
+    def ingest(
+        self, progress: Optional[IngestionProgressTracker] = None
+    ) -> List[TerraformModuleSummary]:
         """Process all repositories and generate summaries.
+
+        Args:
+            progress: Optional tracker for MCP client progress notifications
 
         Returns:
             List of TerraformModuleSummary instances for all processed modules
@@ -100,26 +106,64 @@ class TerraformIngest:
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
         all_summaries = []
+        total_repositories = len(self.config.repositories)
 
-        for repo_config in self.config.repositories:
+        if progress:
+            progress.start(
+                total_repositories,
+                message=f"Starting ingestion of {total_repositories} repositories",
+            )
+
+        for repo_index, repo_config in enumerate(self.config.repositories, start=1):
             self.logger.info(f"Processing repository: {repo_config.url}")
-            summaries = self.repo_manager.process_repository(repo_config)
+            if progress:
+                progress.update(
+                    IngestionPhase.CLONING,
+                    f"Processing repository {repo_index}/{total_repositories}: {repo_config.url}",
+                    current=repo_index,
+                    total=total_repositories,
+                )
+
+            summaries = self.repo_manager.process_repository(
+                repo_config, progress=progress
+            )
             all_summaries.extend(summaries)
+
+            if progress:
+                progress.update(
+                    IngestionPhase.SAVING,
+                    f"Saving {len(summaries)} modules from {repo_config.url}",
+                    current=repo_index,
+                    total=total_repositories,
+                )
 
             # Save summaries for this repository
             for summary in summaries:
-                self._save_summary(summary)
+                self._save_summary(summary, progress=progress)
 
         # Save the module index after all modules are processed
+        if progress:
+            progress.update(IngestionPhase.INDEXING, "Finalizing module index")
         self.finalize_index()
+
+        if progress:
+            progress.complete(
+                f"Ingestion completed: {len(all_summaries)} modules processed",
+                modules_processed=len(all_summaries),
+            )
 
         return all_summaries
 
-    def _save_summary(self, summary: TerraformModuleSummary):
+    def _save_summary(
+        self,
+        summary: TerraformModuleSummary,
+        progress: Optional[IngestionProgressTracker] = None,
+    ):
         """Save a summary to a JSON file.
 
         Args:
             summary: TerraformModuleSummary instance to save
+            progress: Optional tracker for MCP client progress notifications
         """
         # Create a safe filename from repository, ref, and path
         repo_name = summary.repository.rstrip("/").split("/")[-1]
@@ -149,8 +193,16 @@ class TerraformIngest:
         except Exception as e:
             self.logger.warning(f"Failed to add module to index: {e}")
 
+        if progress:
+            progress.add_modules(1)
+
         # Upsert to vector database if enabled
         if self.vector_db:
+            if progress:
+                progress.update(
+                    IngestionPhase.EMBEDDING,
+                    f"Embedding module {summary.repository} @ {summary.ref}",
+                )
             try:
                 doc_id = self.vector_db.upsert_module(summary)
                 self.logger.info(f"Upserted to vector database with ID: {doc_id}")

@@ -16,14 +16,4 @@
 
 [Choose one of the above types of changes]
 
-## Testing
-[How have you tested the change?]
-
-## Checklist
-- [ ] I have added tests that prove my fix is effective or my feature works
-- [ ] I have updated the documentation accordingly
-- [ ] I have added an appropriate example to the documentation to outline the feature
-- [ ] My changes generate no new warnings
-- [ ] Any dependent changes have been merged and published
-
 By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.

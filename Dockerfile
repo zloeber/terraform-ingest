@@ -21,19 +21,17 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    VERSION=$DEPLOY_VERSION
+    SETUPTOOLS_SCM_PRETEND_VERSION=${DEPLOY_VERSION}
 
 WORKDIR /build
 
-# Copy project files
+# Copy project files (skills/ required by hatch force-include in pyproject.toml)
 COPY pyproject.toml uv.lock README.md ./
+COPY skills/ ./skills/
 COPY src/ ./src/
 
 # Build the application with uv (without embeddings dependencies)
-RUN if [ -n "$VERSION" ]; then \
-        SETUPTOOLS_SCM_PRETEND_VERSION=$VERSION; \
-    fi && \
-    uv sync --frozen && \
+RUN uv sync --frozen --no-group dev && \
     uv build --sdist --wheel
 
 # ============================================================================
@@ -55,19 +53,17 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    VERSION=$DEPLOY_VERSION
+    SETUPTOOLS_SCM_PRETEND_VERSION=${DEPLOY_VERSION}
 
 WORKDIR /build
 
-# Copy project files
+# Copy project files (skills/ required by hatch force-include in pyproject.toml)
 COPY pyproject.toml uv.lock README.md ./
+COPY skills/ ./skills/
 COPY src/ ./src/
 
 # Build the application with embeddings dependencies
-RUN if [ -n "$VERSION" ]; then \
-        SETUPTOOLS_SCM_PRETEND_VERSION=$VERSION; \
-    fi && \
-    uv sync --frozen --extra embeddings && \
+RUN uv sync --frozen --no-group dev --extra embeddings && \
     uv build --sdist --wheel
 
 # ============================================================================

@@ -44,8 +44,23 @@ output/
 .terraformrc
 
 # Documentation
-#docs/
+docs/
 
+# Tests (not copied into image)
+tests/
+
+# Code intelligence / agent scaffolding
+.gitnexus
+.cursor
+.claude
+.mex
+.terraform-ingest
+.cursorrules
+CLAUDE.md
+AGENTS.md
+
+# Skills mirrors (bundled skills/ is required and not ignored)
+.cursor/skills
 
 # CI/CD
 .github

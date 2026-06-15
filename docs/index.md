@@ -190,9 +190,11 @@ python -m terraform_ingest.api
 
 - `GET /` - API information and available endpoints
 - `GET /health` - Health check
-- `POST /ingest` - Ingest multiple repositories
+- `POST /ingest` - Ingest multiple repositories (synchronous, with progress tracking)
+- `POST /ingest/background` - Start ingestion from a YAML config file in the background
+- `GET /ingestion/status` - Poll ingestion progress
 - `POST /analyze` - Analyze a single repository
-- `POST /ingest-from-yaml` - Ingest from YAML configuration string
+- `POST /ingest-from-yaml` - Ingest from YAML configuration string (`background=true` for async)
 - `POST /search/vector` - Search modules using vector embeddings
 
 #### Example API Requests

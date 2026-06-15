@@ -24,6 +24,9 @@ dotenv:
   - ".env"
 
 includes:
+  build:
+    taskfile: ./tasks/Taskfile.build.yml
+    optional: true
   docker:
     taskfile: ./tasks/Taskfile.docker.yml
     optional: true
@@ -151,6 +154,47 @@ tasks:
         uv pip install -e ".[test]"
         uv run pytest --maxfail=1 --disable-warnings -v tests
 
+  pre-push:
+    desc: End-of-work checks before push (alias for qa:prepush)
+    cmds:
+      - task: qa:prepush
+
+  qa:quick:
+    desc: Fast gate for agent iteration (lint + targeted tests)
+    cmds:
+      - |
+        zsh ./scripts/prepush-gate.zsh --quick
+
+  qa:prepush:
+    desc: Full local pre-push quality gate
+    cmds:
+      - |
+        zsh ./scripts/prepush-gate.zsh
+
+  qa:prepush:loop:
+    desc: Repeat full gate after auto-fix (use -- rounds=N)
+    cmds:
+      - |
+        zsh ./scripts/prepush-gate.zsh --loop --rounds={{default "3" .CLI_ARGS}}
+
+  qa:hooks:install:
+    desc: Install git pre-push hook (runs task qa:prepush)
+    cmds:
+      - zsh ./scripts/install-git-hooks.zsh
+
+  skills:validate:
+    desc: Validate bundled workflow skills under skills/
+    cmds:
+      - uv run python scripts/validate_skills.py
+
+  security:scan:
+    desc: Run full security audit (sync, pip-audit, bandit)
+    cmds:
+      - |
+        uv sync --frozen --extra test --group dev
+        uv run pip-audit
+        uv run bandit -r src -ll
+
   typecheck:
     desc: Run the type checker
     cmds:
@@ -212,7 +256,7 @@ tasks:
     cmds:
       - task: docker:build
         vars:
-          DOCKER_BUILD_ARGS: "--build-arg DEPLOY_VERSION={{.VERSION}}-$(git rev-parse --short HEAD)"
+          DOCKER_BUILD_ARGS: "--build-arg DEPLOY_VERSION=0.0.0.dev0+g$(git rev-parse --short HEAD)"
 
   mcp:inspector:
     desc: Start MCP Inspector
