@@ -1,6 +1,8 @@
 ---
 name: tests
 description: "Skill for the Tests area of terraform-ingest. 112 symbols across 15 files."
+metadata:
+  internal: true
 ---
 
 # Tests

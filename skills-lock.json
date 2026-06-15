@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "secretzero": {
+      "source": "zloeber/secretzero",
+      "sourceType": "github",
+      "skillPath": "skills/secretzero/SKILL.md",
+      "computedHash": "b521604df8168c575e94292bcc6088d32be2270f90420275c0ba55c0f68df181"
+    },
+    "secretzero-author": {
+      "source": "zloeber/secretzero",
+      "sourceType": "github",
+      "skillPath": "skills/secretzero-author/SKILL.md",
+      "computedHash": "751e879a814ddfc868febe08e477cef86454e75508d66d04c1b54438b1105780"
+    },
+    "secretzero-handle": {
+      "source": "zloeber/secretzero",
+      "sourceType": "github",
+      "skillPath": "skills/secretzero-handle/SKILL.md",
+      "computedHash": "20d4a98c7ff6a5b922bf32fb617d30ab9ef16220dee273d144b6bf96f2b7e4d8"
+    }
+  }
+}

@@ -33,7 +33,9 @@ Automatically generates semantic version tags and releases:
 - ✅ Integrates with existing release workflow
 - ✅ Prevents duplicate releases
 
-**Commit Message Format**: Use conventional commits like `feat:`, `fix:`, `feat!:` to control version bumps
+**Requirements**:
+- Runs in the `production` GitHub Environment
+- Optional `PAT_TOKEN` secret (recommended): used for tag push so `release.yaml` triggers on the new tag. Checkout uses the default `GITHUB_TOKEN`.
 
 ### 3. Release Workflow (release.yaml)
 **Triggers:** When version tags are created (e.g., v1.2.3)
@@ -192,6 +194,14 @@ git log --oneline --graph --decorate
 ```
 
 ## Troubleshooting
+
+### Semantic Release checkout failed (HTTPS username prompt)
+- **Cause:** `actions/checkout` was given an empty/invalid `PAT_TOKEN`, so git fetch had no credentials.
+- **Fix:** Checkout now uses the default `GITHUB_TOKEN`. Ensure `PAT_TOKEN` is set only for tag push:
+  - Repo → Settings → Secrets and variables → Actions → `PAT_TOKEN`
+  - Or add the same secret to the **production** environment if you use environment-scoped secrets
+  - PAT needs `repo` scope (classic) or contents write (fine-grained)
+- **Re-run:** Actions → Semantic Release → Run workflow (after pushing the workflow fix or configuring the secret)
 
 ### Release didn't trigger after merge
 - Check if commit messages follow conventional format

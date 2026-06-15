@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
-          token: ${{ secrets.PAT_TOKEN }}
+          persist-credentials: false
 
       - name: Set up Git
         run: |
@@ -122,8 +122,16 @@ jobs:
 
       - name: Create and push tag
         if: steps.check_tag.outputs.tag_exists == 'false'
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           git tag -a "${{ steps.version.outputs.new_version }}" -m "Release ${{ steps.version.outputs.new_version }}"
+          if [ -n "$PAT_TOKEN" ]; then
+            git remote set-url origin "https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git"
+          else
+            echo "::warning::PAT_TOKEN is not set. Tag push uses GITHUB_TOKEN; release.yaml may not trigger on tag push."
+            git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          fi
           git push origin "${{ steps.version.outputs.new_version }}"
           echo "Created and pushed tag: ${{ steps.version.outputs.new_version }}"
 
@@ -147,6 +155,8 @@ jobs:
       - name: Create GitHub Release
         if: steps.check_tag.outputs.tag_exists == 'false'
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
         with:
           tag_name: ${{ steps.version.outputs.new_version }}
           name: Release ${{ steps.version.outputs.new_version }}

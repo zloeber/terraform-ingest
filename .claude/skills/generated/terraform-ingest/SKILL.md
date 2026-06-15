@@ -1,6 +1,8 @@
 ---
 name: terraform-ingest
 description: "Skill for the Terraform_ingest area of terraform-ingest. 261 symbols across 23 files."
+metadata:
+  internal: true
 ---
 
 # Terraform_ingest

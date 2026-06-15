@@ -93,3 +93,4 @@ npm-debug.log*
 public/
 docs/api/
 docs/superpowers
+secret_results.json
