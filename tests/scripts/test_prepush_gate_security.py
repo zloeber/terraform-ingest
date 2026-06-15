@@ -85,7 +85,9 @@ def test_pytest_targets_falls_back_for_unmapped_src() -> None:
 def test_should_build_docker_when_packaging_changes() -> None:
     gate = _prepush_gate_module()
     assert gate.should_build_docker({"Dockerfile"}, docs_only=False)
-    assert gate.should_build_docker({"skills/terraform-ingest/SKILL.md"}, docs_only=False)
+    assert gate.should_build_docker(
+        {"skills/terraform-ingest/SKILL.md"}, docs_only=False
+    )
     assert gate.should_build_docker({"src/terraform_ingest/cli.py"}, docs_only=False)
     assert not gate.should_build_docker({"docs/dev.md"}, docs_only=False)
     assert not gate.should_build_docker({"tests/test_api.py"}, docs_only=False)

@@ -16,4 +16,6 @@ terraform = "latest"
 node = "latest"
 ruff = "latest"
 npm = "latest"
+"npm:skills" = "latest"
+gitleaks = "8.30.1"
 
