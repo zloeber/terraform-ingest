@@ -256,7 +256,7 @@ tasks:
     cmds:
       - task: docker:build
         vars:
-          DOCKER_BUILD_ARGS: "--build-arg DEPLOY_VERSION={{.VERSION}}-$(git rev-parse --short HEAD)"
+          DOCKER_BUILD_ARGS: "--build-arg DEPLOY_VERSION=0.0.0.dev0+g$(git rev-parse --short HEAD)"
 
   mcp:inspector:
     desc: Start MCP Inspector

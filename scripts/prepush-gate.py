@@ -20,6 +20,11 @@ SUMMARY_PATH = LOGS_DIR / "summary.json"
 SECURITY_DEP_FILES = frozenset({"pyproject.toml", "uv.lock"})
 SECURITY_SRC_PREFIX = "src/"
 
+DOCKER_RELEVANT_FILES = frozenset(
+    {"Dockerfile", ".dockerignore", "pyproject.toml", "uv.lock", "README.md"}
+)
+DOCKER_RELEVANT_PREFIXES = ("src/", "skills/")
+
 NON_DOCS_PREFIXES = (
     "src/",
     "tests/",
@@ -189,6 +194,56 @@ def should_validate_server_json(changed: set[str] | None) -> bool:
         path == "server.json" or path.startswith(SECURITY_SRC_PREFIX)
         for path in changed
     )
+
+
+def should_build_docker(changed: set[str] | None, docs_only: bool) -> bool:
+    """Run builder-slim when packaging inputs changed; skip docs-only and unrelated diffs."""
+    if docs_only or not Path("Dockerfile").is_file():
+        return False
+    if changed is None or not changed:
+        return True
+    normalized = {Path(path).as_posix() for path in changed}
+    return any(
+        path in DOCKER_RELEVANT_FILES
+        or any(path.startswith(prefix) for prefix in DOCKER_RELEVANT_PREFIXES)
+        for path in normalized
+    )
+
+
+def docker_build_cmd() -> list[str]:
+    """Validate the slim builder stage with the same PEP 440 dev version CI uses."""
+    sha = "local"
+    if shutil.which("git") and Path(".git").exists():
+        completed = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if completed.returncode == 0 and completed.stdout.strip():
+            sha = completed.stdout.strip()
+    version = f"0.0.0.dev0+g{sha}"
+    return [
+        "docker",
+        "build",
+        "--target",
+        "builder-slim",
+        "--build-arg",
+        f"DEPLOY_VERSION={version}",
+        "-f",
+        "Dockerfile",
+        ".",
+    ]
+
+
+def docker_build_skip_reason(changed: set[str] | None, docs_only: bool) -> str | None:
+    if not Path("Dockerfile").is_file():
+        return "no Dockerfile"
+    if docs_only:
+        return "docs-only diff"
+    if should_build_docker(changed, docs_only=False):
+        return None
+    return "no Docker packaging changes"
 
 
 def pytest_targets(changed: set[str] | None) -> list[str]:
@@ -508,6 +563,23 @@ def run_full_gate(
         failed = True
         if fail_fast:
             return True
+
+    if shutil.which("docker"):
+        docker_skip = docker_build_skip_reason(changed, docs_only)
+        if not run_stage(
+            summary,
+            "docker_build",
+            docker_build_cmd(),
+            logs_dir,
+            verbose=verbose,
+            skip_reason=docker_skip,
+        ):
+            failed = True
+            if fail_fast:
+                return True
+    else:
+        skip_step("docker_build", "docker not installed")
+        record_stage(summary, "docker_build", "skip")
 
     if not run_security_scan(
         summary, logs_dir, verbose=verbose, changed=changed, docs_only=docs_only

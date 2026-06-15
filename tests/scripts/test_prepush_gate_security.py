@@ -82,6 +82,25 @@ def test_pytest_targets_falls_back_for_unmapped_src() -> None:
     assert gate.pytest_targets({"src/terraform_ingest/cli.py"}) == []
 
 
+def test_should_build_docker_when_packaging_changes() -> None:
+    gate = _prepush_gate_module()
+    assert gate.should_build_docker({"Dockerfile"}, docs_only=False)
+    assert gate.should_build_docker({"skills/terraform-ingest/SKILL.md"}, docs_only=False)
+    assert gate.should_build_docker({"src/terraform_ingest/cli.py"}, docs_only=False)
+    assert not gate.should_build_docker({"docs/dev.md"}, docs_only=False)
+    assert not gate.should_build_docker({"tests/test_api.py"}, docs_only=False)
+    assert not gate.should_build_docker({"docs/dev.md"}, docs_only=True)
+
+
+def test_docker_build_cmd_uses_pep440_dev_version() -> None:
+    gate = _prepush_gate_module()
+    cmd = gate.docker_build_cmd()
+    assert cmd[:3] == ["docker", "build", "--target"]
+    assert "builder-slim" in cmd
+    version_arg = next(arg for arg in cmd if arg.startswith("DEPLOY_VERSION="))
+    assert version_arg.startswith("DEPLOY_VERSION=0.0.0.dev0+g")
+
+
 def test_gate_summary_writes_json(tmp_path: Path) -> None:
     gate = _prepush_gate_module()
     summary = gate.GateSummary(

@@ -107,6 +107,7 @@ Read summary.json for stage status; re-run with --verbose for log tails.
 | `skills_validate` | Skip on docs-only unless `skills/` changed |
 | `server_json` / validators | Context-aware |
 | `unit_tests`, `build` | Skip on docs-only |
+| `docker_build` | Optional: `builder-slim` when packaging files changed; skip if docker missing |
 | `security_*` | Context-aware; skip on docs-only |
 | `security_gitleaks` | Optional; `--strict` only |
 
@@ -248,6 +249,7 @@ Inspect this repo's task/lint/test commands first. Run both gates and show summa
 | No server.json | Omit server_json stage |
 | Docs-only diff | Skip test/build/security in both tiers |
 | Heavy optional extras | Security sync without `--all-extras` |
+| Docker packaging | Full gate only: `docker build --target builder-slim` when Dockerfile/src/skills/pyproject changed; tighten `.dockerignore` |
 
 ## Context-aware logic (embedded reference)
 

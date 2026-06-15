@@ -44,6 +44,7 @@ Example summary:
 | `server_json` | MCP registry check (when relevant) |
 | `unit_tests` | `task test` |
 | `build` | `task build` |
+| `docker_build` | `builder-slim` target only (when Dockerfile/src/skills/pyproject changed) |
 | `security_*` | Context-aware sync, pip-audit, bandit |
 | `security_gitleaks` | Optional; fails only with `--strict` |
 
@@ -60,7 +61,18 @@ Example summary:
 When the git diff is **only** documentation (`docs/**`, `*.md`, `mkdocs.yml`, `.mex/**`):
 
 - **Quick gate:** all stages skipped → immediate pass
-- **Full gate:** skips format, lint, test, build, security, server.json
+- **Full gate:** skips format, lint, test, build, docker, security, server.json
+
+## Docker build (full gate only)
+
+`docker_build` runs only when:
+
+- `docker` is installed
+- The diff touches packaging inputs: `Dockerfile`, `.dockerignore`, `pyproject.toml`, `uv.lock`, `README.md`, `src/`, or `skills/`
+
+It builds **`--target builder-slim`** (not the runtime image or embeddings variant) with the same PEP 440 dev version CI uses. `.dockerignore` excludes tests, docs, and agent scaffolding to keep context small.
+
+Skip locally with no Docker changes, or when Docker is not installed.
 
 ## Flags
 
