@@ -259,6 +259,26 @@ class VectorDBManager:
         # Use hash to ensure valid ID format
         return hashlib.sha256(id_string.encode()).hexdigest()
 
+    @staticmethod
+    def _extract_repo_name(repository: str) -> str:
+        """Extract the repository name from a git URL.
+
+        Handles both HTTPS and SSH-style URLs, with or without a .git suffix:
+          https://github.com/cloudposse-terraform-components/aws-argocd-github-repo.git  -> aws-argocd-github-repo
+          git@github.com:cloudposse-terraform-components/aws-argocd-github-repo.git       -> aws-argocd-github-repo
+          https://github.com/cloudposse-terraform-components/aws-argocd-github-repo       -> aws-argocd-github-repo
+
+        Args:
+            repository: Git repository URL
+
+        Returns:
+            Repository name without .git suffix
+        """
+        name = repository.rstrip("/").split("/")[-1]
+        if name.endswith(".git"):
+            name = name[:-4]
+        return name
+
     def _prepare_document_text(self, summary: TerraformModuleSummary) -> str:
         """Prepare text content for embedding.
 
@@ -269,6 +289,18 @@ class VectorDBManager:
             Combined text for embedding
         """
         parts = []
+
+        # Module name — always included; provides a strong, noise-free signal.
+        # For pseudo-monorepo structures (e.g. modules/argocd inside aws-argocd-github-repo)
+        # both the repo name and the submodule leaf are appended so searches for
+        # either term match correctly.
+        repo_name = self._extract_repo_name(summary.repository)
+        name_parts = [repo_name]
+        if summary.path and summary.path not in (".", "/", ""):
+            path_leaf = summary.path.replace("\\", "/").rstrip("/").split("/")[-1]
+            if path_leaf and path_leaf != repo_name:
+                name_parts.append(path_leaf)
+        parts.append(f"Module: {' '.join(name_parts)}")
 
         # Module description
         if self.config.include_description and summary.description:

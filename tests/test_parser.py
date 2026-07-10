@@ -182,6 +182,115 @@ def test_extract_description():
         assert "VPC" in description
 
 
+def test_extract_description_skips_simple_badge():
+    """Test that a simple badge line before the description is skipped."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        readme = Path(tmpdir) / "README.md"
+        readme.write_text(
+            "# tf-mod-acm\n\n"
+            "![CI](https://github.com/org/repo/workflows/CI/badge.svg)\n\n"
+            "This module manages ACM certificates."
+        )
+
+        parser = TerraformParser(tmpdir)
+        description = parser._extract_description()
+
+        assert description is not None
+        assert "ACM certificates" in description
+        assert "CI" not in description
+
+
+def test_extract_description_skips_linked_badge():
+    """Test that a linked badge ([![CI](...)(...)](url)) before the description is skipped."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        readme = Path(tmpdir) / "README.md"
+        readme.write_text(
+            "# tf-mod-s3\n\n"
+            "[![CI](https://github.com/org/repo/actions/workflows/ci.yaml/badge.svg)]"
+            "(https://github.com/org/repo/actions/workflows/ci.yaml)\n\n"
+            "This module creates S3 buckets with encryption."
+        )
+
+        parser = TerraformParser(tmpdir)
+        description = parser._extract_description()
+
+        assert description is not None
+        assert "S3 buckets" in description
+        assert "CI" not in description
+
+
+def test_extract_description_skips_html_comment():
+    """Test that HTML comment lines (<!-- -->) before the description are skipped."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        readme = Path(tmpdir) / "README.md"
+        readme.write_text(
+            "<!-- BEGIN_TF_DOCS -->\n# tf-mod-kms\n\nThis module manages KMS keys."
+        )
+
+        parser = TerraformParser(tmpdir)
+        description = parser._extract_description()
+
+        assert description is not None
+        assert "KMS keys" in description
+        assert "BEGIN_TF_DOCS" not in description
+
+
+def test_extract_description_skips_markdownlint_comment():
+    """Test that markdownlint-disable comments before the description are skipped."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        readme = Path(tmpdir) / "README.md"
+        readme.write_text(
+            "<!-- markdownlint-disable no-inline-html -->\n"
+            "# tf-mod-elasticache\n\n"
+            "This module creates ElastiCache clusters."
+        )
+
+        parser = TerraformParser(tmpdir)
+        description = parser._extract_description()
+
+        assert description is not None
+        assert "ElastiCache" in description
+        assert "markdownlint" not in description
+
+
+def test_extract_description_skips_mixed_preamble():
+    """Test that a combination of HTML comments, badges, and blank lines are all skipped."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        readme = Path(tmpdir) / "README.md"
+        readme.write_text(
+            "<!-- BEGIN_TF_DOCS -->\n"
+            "# tf-mod-dhp-rds\n"
+            "<!-- markdownlint-disable no-inline-html -->\n\n"
+            "[![CI](https://github.com/org/repo/badge.svg)](https://github.com/org/repo)\n\n"
+            "This module manages RDS instances with Icario standards."
+        )
+
+        parser = TerraformParser(tmpdir)
+        description = parser._extract_description()
+
+        assert description is not None
+        assert "RDS instances" in description
+        assert "BEGIN_TF_DOCS" not in description
+        assert "markdownlint" not in description
+        assert "CI" not in description
+
+
+def test_extract_description_returns_none_when_only_preamble():
+    """Test that None is returned when the README contains only badges and comments, no prose."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        readme = Path(tmpdir) / "README.md"
+        readme.write_text(
+            "# tf-mod-template\n\n"
+            "![CI](https://github.com/org/repo/workflows/CI/badge.svg)\n"
+        )
+
+        parser = TerraformParser(tmpdir)
+        # No main.tf either, so description should be None
+        description = parser._extract_description()
+
+        assert description is None
+
+
 def test_parse_module_complete():
     """Test complete module parsing."""
     with tempfile.TemporaryDirectory() as tmpdir:

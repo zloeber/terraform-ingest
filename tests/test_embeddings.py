@@ -270,6 +270,107 @@ def test_prepare_document_text_partial():
     assert "Resources:" not in text
 
 
+def test_prepare_document_text_includes_module_name_for_root_module():
+    """Test that the repo name is included in the document text for a root-level module."""
+    config = EmbeddingConfig(enabled=True)
+    manager = VectorDBManager(config)
+
+    summary = TerraformModuleSummary(
+        repository="https://github.com/cloudposse-terraform-components/aws-argocd-github-repo.git",
+        ref="v2.1.0",
+        path=".",
+    )
+
+    text = manager._prepare_document_text(summary)
+
+    assert "Module: aws-argocd-github-repo" in text
+
+
+def test_prepare_document_text_includes_module_name_for_submodule():
+    """Test that both repo name and submodule path are included for pseudo-monorepo modules."""
+    config = EmbeddingConfig(enabled=True)
+    manager = VectorDBManager(config)
+
+    summary = TerraformModuleSummary(
+        repository="https://github.com/cloudposse-terraform-components/aws-argocd-github-repo.git",
+        ref="v1.0.0",
+        path="modules/argocd",
+    )
+
+    text = manager._prepare_document_text(summary)
+
+    assert "Module: aws-argocd-github-repo argocd" in text
+
+
+def test_prepare_document_text_deduplicates_module_name_when_path_matches_repo():
+    """Test that the path leaf is not repeated when it already matches the repo name."""
+    config = EmbeddingConfig(enabled=True)
+    manager = VectorDBManager(config)
+
+    summary = TerraformModuleSummary(
+        repository="https://github.com/cloudposse-terraform-components/argocd.git",
+        ref="main",
+        path="modules/argocd",
+    )
+
+    text = manager._prepare_document_text(summary)
+
+    # Should appear once, not "Module: argocd argocd"
+    assert "Module: argocd" in text
+    assert "Module: argocd argocd" not in text
+
+
+def test_prepare_document_text_includes_module_name_with_ssh_url():
+    """Test that SSH-style git URLs are parsed correctly for the module name."""
+    config = EmbeddingConfig(enabled=True)
+    manager = VectorDBManager(config)
+
+    summary = TerraformModuleSummary(
+        repository="git@github.com:cloudposse-terraform-components/aws-argocd-github-repo.git",
+        ref="v1.0.0",
+        path="modules/argocd",
+    )
+
+    text = manager._prepare_document_text(summary)
+
+    assert "Module: aws-argocd-github-repo argocd" in text
+
+
+def test_prepare_document_text_includes_module_name_with_https_url_no_git_suffix():
+    """Test that HTTPS URLs without .git suffix are parsed correctly."""
+    config = EmbeddingConfig(enabled=True)
+    manager = VectorDBManager(config)
+
+    summary = TerraformModuleSummary(
+        repository="https://github.com/cloudposse-terraform-components/aws-argocd-github-repo",
+        ref="v2.1.0",
+        path=".",
+    )
+
+    text = manager._prepare_document_text(summary)
+
+    assert "Module: aws-argocd-github-repo" in text
+
+
+def test_prepare_document_text_module_name_appears_before_description():
+    """Test that the Module line appears before the Description line in the document."""
+    config = EmbeddingConfig(enabled=True, include_description=True)
+    manager = VectorDBManager(config)
+
+    summary = TerraformModuleSummary(
+        repository="https://github.com/cloudposse-terraform-components/aws-argocd-github-repo.git",
+        ref="v2.1.0",
+        path=".",
+        description="Manages ACM certificates.",
+    )
+
+    text = manager._prepare_document_text(summary)
+
+    module_pos = text.index("Module:")
+    description_pos = text.index("Description:")
+    assert module_pos < description_pos
+
+
 def test_prepare_metadata():
     """Test metadata preparation."""
     config = EmbeddingConfig(enabled=True)

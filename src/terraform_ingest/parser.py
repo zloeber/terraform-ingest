@@ -438,6 +438,27 @@ class TerraformParser:
                     )
                 )
 
+    @staticmethod
+    def _is_skippable_readme_line(line: str) -> bool:
+        """Return True if a README line is markup scaffolding rather than prose.
+
+        Skips the following patterns that commonly appear before real content:
+        - Blank lines
+        - Heading lines (# ...)
+        - HTML comment lines (<!-- ... --> and closing -->)
+        - Badge / image lines starting with ![ (covers both ![CI](...) and [![CI](...)(...))
+        """
+        stripped = line.strip()
+        if not stripped:
+            return True
+        if stripped.startswith("#"):
+            return True
+        if stripped.startswith("<!--") or stripped.startswith("-->"):
+            return True
+        if stripped.startswith("![") or stripped.startswith("[!["):
+            return True
+        return False
+
     def _extract_description(self) -> Optional[str]:
         """Extract module description from comments or README."""
         # Try to find description in main.tf comments
@@ -462,21 +483,24 @@ class TerraformParser:
         # Fall back to README
         readme = self._read_readme()
         if readme:
-            # Extract first paragraph as description
+            # Extract first prose paragraph, skipping markup scaffolding lines
+            # (badges, HTML comments, headings, blank lines) that commonly
+            # appear before the real description in community Terraform modules.
             lines = readme.split("\n")
             for i, line in enumerate(lines):
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    # Find the end of the first paragraph
-                    paragraph = [line]
-                    for next_line in lines[i + 1 :]:
-                        next_line = next_line.strip()
-                        if not next_line:
-                            break
-                        if next_line.startswith("#"):
-                            break
-                        paragraph.append(next_line)
-                    return " ".join(paragraph)[:500]  # Limit to 500 chars
+                if self._is_skippable_readme_line(line):
+                    continue
+                # Found the first prose line — collect the full paragraph
+                first_line = line.strip()
+                paragraph = [first_line]
+                for next_line in lines[i + 1 :]:
+                    next_line = next_line.strip()
+                    if not next_line:
+                        break
+                    if next_line.startswith("#"):
+                        break
+                    paragraph.append(next_line)
+                return " ".join(paragraph)[:500]  # Limit to 500 chars
 
         return None
 
